@@ -7,7 +7,7 @@ import subprocess
 import sys
 import zipfile
 
-from github import Github
+from github import Github  # pip install PyGithub
 
 # Temporary directory for scratch space
 TEMP_DIR = '__temp__'
