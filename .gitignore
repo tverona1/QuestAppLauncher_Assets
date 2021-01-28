@@ -1,2 +1,6 @@
 /__temp__/
 token.txt
+.idea
+/venv/
+/access_token
+/config.json
