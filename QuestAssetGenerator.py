@@ -45,6 +45,8 @@ ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip' # o before q(uest) to prio quest
 VRDB_APPS = "vrdb.json"
 VRDB_CACHETIME = 12  # time in hours to refresh the cachefile
 
+IMGFETCHER_WORKERS = 50
+
 
 # Change the region
 # VRDB_URL = "https://vrdb.app/quest/index_us.json"
@@ -213,7 +215,7 @@ def download_sidequest_assets():
     appnames_sidequest_data = {}
 
     if len(sidequest_data["data"]) > 0:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=IMGFETCHER_WORKERS) as executor:
             for idx, sidequest_entry in enumerate(sidequest_data["data"]):
                 # print(f"{idx} => {sidequest_entry}")
                 print(f"Doing {idx} => {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
