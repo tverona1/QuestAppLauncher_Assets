@@ -17,7 +17,8 @@ Add the repo url in your config.json `downloadRepos` section as described in [Qu
 ---
 ## Example config.json
 
-Be sure to add teh new repo AFTER tverona1 repo
+Be sure to add the new repo AFTER tverona1 repo in `downloadRepos` section.
+
 ```
 {
   "gridSize": {
