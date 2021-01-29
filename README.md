@@ -52,7 +52,7 @@ or run all tasks and do a release
 ```
 QuestAssetGenerator.py -a ACCESS_TOKEN -da -dr -c -g
 
--a ACCESS_TOKEN | *required* Peronal Github accesstoken for releasing
+-a ACCESS_TOKEN |Peronal Github accesstoken for releasing
 -g  | Add genres to appnames_quest.json
 -da | Download Assets from Oculus Store
 -ds | Download Assets from SideQuest Store
@@ -60,6 +60,8 @@ QuestAssetGenerator.py -a ACCESS_TOKEN -da -dr -c -g
 -c  | Compare latest release with new release
 -r  | Create a Github release
 ```
+
+If there is no ACCESS_TOKEN in arguments, the script tries to use a `access_token` file.
 
 ---
 
