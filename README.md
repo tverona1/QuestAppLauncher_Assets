@@ -6,8 +6,7 @@
 [![GitHub forks](https://img.shields.io/github/forks/reloxx13/QuestAppLauncher_Assets.svg)](https://github.com/reloxx13/QuestAppLauncher_Assets/network)
 [![Github all releases](https://img.shields.io/github/downloads/reloxx13/QuestAppLauncher_Assets/total.svg?label=gh%20downloads)](https://GitHub.com/reloxx13/QuestAppLauncher_Assets/releases/) 
 
-[![GitHub license](https://img.shields.io/github/license/reloxx13/QuestAppLauncher_Assets.svg)](https://github.com/reloxx13/QuestAppLauncher_Assets/blob/master/LICENSE)
-
+[comment]: <> ([![GitHub license]&#40;https://img.shields.io/github/license/reloxx13/QuestAppLauncher_Assets.svg&#41;]&#40;https://github.com/reloxx13/QuestAppLauncher_Assets/blob/master/LICENSE&#41;)
 
 # QuestAppLauncher_Assets
 Assets (icon pack, app names) for QuestAppLauncher
