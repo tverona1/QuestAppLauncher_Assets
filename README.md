@@ -57,7 +57,7 @@ QuestAssetGenerator.py -a ACCESS_TOKEN -da -dr -c -g
 
 ---
 
-`python -m venv .`
+`python -m venv venv`
 
 `.\venv\Scripts\pip.exe install requests`
 `.\venv\Scripts\pip.exe install PyGithub`
