@@ -24,6 +24,7 @@ WINDIFF_EXE_PATH = 'bin\\windiff.exe'
 QUEST_DIR = 'quest'
 ICONPACK_QUEST = 'iconpack_quest.zip'
 APPNAMES_QUEST = 'appnames_quest.json'
+APPNAMES_QUEST_GENREFIED = 'appnames_quest_genrefied.json'
 ICONPACK_OTHER = 'iconpack_others.zip'
 APPNAMES_OTHER = 'appnames_other.json'
 APPNAMES_GALAG_NAME = 'appnames_quest_en_US.json'
@@ -199,18 +200,23 @@ def create_release(repo):
     print("=== START create_release ===")
 
     tag = 'v' + datetime.date.today().strftime('%Y.%m.%d')
-    name = tag + ': Update quest assets'
+    name = tag + ': Update Quest assets'
     print(str.format('Creating release: tag: %s, name: %s' % (tag, name)))
-    release = repo.create_git_release(tag=tag, name=name, message='Updating Quest assets', draft=True)
+    release = repo.create_git_release(tag=tag, name=name, message='Updating Quest assets', draft=False)
 
     # Upload the assets, refreshing quest from generated path
-    if(os.path.isfile(os.path.join(get_release_download_path(), APPNAMES_OTHER))):
-        print(f"upload {APPNAMES_OTHER}")
-        release.upload_asset(os.path.join(get_release_download_path(), APPNAMES_OTHER))
+    # if(os.path.isfile(os.path.join(get_release_download_path(), APPNAMES_OTHER))):
+    #     print(f"upload {APPNAMES_OTHER}")
+    #     release.upload_asset(os.path.join(get_release_download_path(), APPNAMES_OTHER))
+    #
+    # if (os.path.isfile(os.path.join(get_release_download_path(), ICONPACK_OTHER))):
+    #     print(f"upload {ICONPACK_OTHER}")
+    #     release.upload_asset(os.path.join(get_release_download_path(), ICONPACK_OTHER))
 
-    if (os.path.isfile(os.path.join(get_release_download_path(), ICONPACK_OTHER))):
-        print(f"upload {ICONPACK_OTHER}")
-        release.upload_asset(os.path.join(get_release_download_path(), ICONPACK_OTHER))
+
+    if (os.path.isfile(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED))):
+        print(f"upload {APPNAMES_QUEST_GENREFIED}")
+        release.upload_asset(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED))
 
     print(f"upload {APPNAMES_QUEST}")
     release.upload_asset(os.path.join(get_galag_download_path(), APPNAMES_QUEST))
@@ -232,23 +238,23 @@ def populate_genre():
 
     if app_file_age_in_hours is False or app_file_age_in_hours >= VRDB_CACHETIME:
         print(f"Load applist from {VRDB_URL}")
-        vr_db_data = loadJson(VRDB_URL)
+        vrdb_data = load_json(VRDB_URL)
     else:
         print(f"Load applist from cached {get_vrdb_file()}")
-        vr_db_data = loadJson(get_vrdb_file())
+        vrdb_data = load_json(get_vrdb_file())
 
 
-    appname_quest_data = loadJson(os.path.join(get_galag_download_path(), APPNAMES_QUEST))
-    appname_quest_data_with_genres = parseGenres(appname_quest_data,vr_db_data)
+    appname_quest_data = load_json(os.path.join(get_galag_download_path(), APPNAMES_QUEST))
+    appname_quest_data_with_genres = parse_genres(appname_quest_data,vrdb_data)
 
-    with open(os.path.join(get_galag_download_path(), APPNAMES_QUEST), 'w', encoding='utf8') as outfile:
+    with open(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED), 'w', encoding='utf8') as outfile:
         json.dump(appname_quest_data_with_genres, outfile, indent=4, ensure_ascii=False)
 
 
-def loadJson(pathOrUrl):
+def load_json(path_or_url):
     data = []
-    if pathOrUrl.find("http") == 0:
-        response = urllib.request.urlopen(pathOrUrl)
+    if path_or_url.find("http") == 0:
+        response = urllib.request.urlopen(path_or_url)
         response = response.read()
         if not response or len(response) == 0:
             print(f'Loading from {VRDB_URL} FAILED: response error')
@@ -265,12 +271,12 @@ def loadJson(pathOrUrl):
         with open(get_vrdb_file(), 'w', encoding='utf8') as outfile:
             json.dump(data, outfile, indent=4, ensure_ascii=False)
     else:
-        with open(pathOrUrl, encoding='utf8') as json_file:
+        with open(path_or_url, encoding='utf8') as json_file:
             data = json.load(json_file)
     return data
 
 
-def parseGenres(app_names,vr_db_data):
+def parse_genres(app_names,vrdb_data):
     # print(app_names)
     for app_name, app_data in app_names.items():
         # print(app_name + " => " + json.dumps(app_data))
@@ -279,7 +285,7 @@ def parseGenres(app_names,vr_db_data):
             print(f"ERROR {app_name} has no app title | app_data => {app_data}")
             continue
 
-        genres = get_genres_from_app_list_by_app_name(app_data["name"],vr_db_data)
+        genres = get_genres_from_app_list_by_app_name(app_data["name"],vrdb_data)
         if genres:
             genres = genres.replace("360 Experience (non-game)", "360 Experience")
             genres = [genres.strip() for genres in genres.split(',')]
@@ -295,11 +301,11 @@ def parseGenres(app_names,vr_db_data):
     return app_names
 
 
-def get_genres_from_app_list_by_app_name(app_name,vr_db_data):
+def get_genres_from_app_list_by_app_name(app_name,vrdb_data):
     genres = ""
     found = False
-    for idx, appListData in enumerate(vr_db_data["data"]):
-        appListName = appListData[1] # get link with name from json
+    for idx, vrdb_entry in enumerate(vrdb_data["data"]):
+        appListName = vrdb_entry[1] # get link with name from json
         appListName = re.sub('<[^<]+?>', '', appListName) # remove html tags
         prepared_app_name = app_name.lower().replace(" - demo", "").replace(" - vr comic", "").replace(" - vr","")
 
@@ -311,7 +317,7 @@ def get_genres_from_app_list_by_app_name(app_name,vr_db_data):
         if prepared_app_name in appListName.lower():
             found = True
             # print(f"Found app `{app_name}` in applist {idx}|´{appListName}´")
-            genres = appListData[11]
+            genres = vrdb_entry[11]
             # print(f"Genres => {genres}")
             break
 

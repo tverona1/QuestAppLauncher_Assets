@@ -40,11 +40,11 @@ Example config.json
   "background": "",
   "downloadRepos": [
     {
-      "repoUri": "reloxx13/QuestAppLauncher_Assets/releases/latest",
+      "repoUri": "tverona1/QuestAppLauncher_Assets/releases/latest",
       "type": "github"
     },
     {
-      "repoUri": "tverona1/QuestAppLauncher_Assets/releases/latest",
+      "repoUri": "reloxx13/QuestAppLauncher_Assets/releases/latest",
       "type": "github"
     }
   ]
