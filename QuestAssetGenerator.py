@@ -89,7 +89,7 @@ def main():
         args.download_assets = True
         args.download_sidequest = True
         args.genrefy = True
-        args.compare = True
+        # args.compare = True
         args.release = True
 
     # Instantiate github client
@@ -138,6 +138,9 @@ def get_cache_file(cachefile):
 
 def get_galag_download_path():
     return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), QALAG_OUTPUT_DIR))
+
+def get_override_path(OVERRIDE):
+    return os.path.abspath(os.path.join(os.path.abspath("overrides"), OVERRIDE))
 
 def download_sidequest_assets():
 
@@ -246,53 +249,106 @@ def download_sidequest_assets():
     zipf.close()
 
 
-def fetch_sidequest_images(sidequest_entry,idx):
-    image_url = sidequest_entry["image_url"]
+def fetch_sidequest_images(sidequest_entry,idx, force_banner=False):
 
-    if not image_url:
-        print(f"{idx} => No image, use banner")
-        image_url = sidequest_entry["app_banner"]
+    override_path = os.path.join(get_override_path(SIDEQUEST_DIR), sidequest_entry["packagename"]) + ".jpg"
+    if os.path.exists(override_path):
+        print(f"use override image for {sidequest_entry['packagename']}")
+        file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + ".jpg"
+        optimize_image(override_path,file_path_new)
+        # change_aspect_ratio(override_path,file_path_new)
 
-    if not image_url:
-        print(f"{idx} => NO IMAGE FOR {sidequest_entry['name']}")
     else:
-        print(f"{idx} => load image {image_url}")
-        r = requests.get(image_url, allow_redirects=True, headers={'Accept': '*/*'})
+        image_url = sidequest_entry["image_url"]
+        if not image_url or image_url == "" or force_banner:
+            print(f"{idx} => No image, use banner")
+            image_url = sidequest_entry["app_banner"]
 
-        content_type = r.headers['content-type']
-        extension = mimetypes.guess_extension(content_type)
+        if not image_url or image_url == "" or image_url == "n/a":
+            print(f"{idx} => NO IMAGE FOR {sidequest_entry['name']}")
+        else:
+            print(f"{idx} => load image {image_url}")
+            r = requests.get(image_url, allow_redirects=True, headers={'Accept': '*/*'})
 
-        if not extension:
-            print(f"{idx} => EXTENSION ERROR: {extension}")
-            extension = os.path.splitext(image_url)[len(os.path.splitext(image_url)) - 1]
-            print(f"{idx} => NEW TRY: {extension}")
+            content_type = r.headers['content-type']
+            extension = mimetypes.guess_extension(content_type)
 
-        file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + extension
-        open(file_path, 'wb').write(r.content)
+            if not extension:
+                print(f"{idx} => EXTENSION ERROR: {extension}")
+                extension = os.path.splitext(image_url)[len(os.path.splitext(image_url)) - 1]
+                print(f"{idx} => NEW TRY: {extension}")
 
-        if extension != ".jpg":
-            print(f"{idx} => Convert {extension} to JPG => {slugify(sidequest_entry['packagename']) + extension}")
-            try:
-                file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR),
-                                             slugify(sidequest_entry["packagename"])) + ".jpg"
-                Image.open(file_path).convert('RGB').save(file_path_new)
-                os.remove(file_path)
-                file_path = file_path_new
-                extension = ".jpg"
-            except Exception as e:
-                print(f"{idx} => Convert error {e}")
+            file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + extension
+            open(file_path, 'wb').write(r.content)
 
-        if extension == ".jpg":
-            # optimize images
-            img = Image.open(file_path)
-            # I downsize the image with an ANTIALIAS filter (gives the highest quality)
-            img.thumbnail((720, 405), Image.ANTIALIAS)
-            img.save(file_path, optimize=True, quality=95)
+            if extension != ".jpg":
+                print(f"{idx} => Convert {extension} to JPG => {slugify(sidequest_entry['packagename']) + extension}")
+                try:
+                    file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR),
+                                                 slugify(sidequest_entry["packagename"])) + ".jpg"
+                    Image.open(file_path).convert('RGB').save(file_path_new)
+                    os.remove(file_path)
+                    file_path = file_path_new
+                    extension = ".jpg"
+                except Exception as e:
+                    print(f"{idx} => Convert error {e}")
+
+            if extension == ".jpg":
+               optimize_image(file_path)
+               # change_aspect_ratio(file_path)
+
+            # image = Image.open(file_path)
+            # width = image.size[0]
+            # height = image.size[1]
+
+            # if (width == height and not force_banner):
+            #     print("image is 1:1, try banner url")
+            #     fetch_sidequest_images(sidequest_entry, idx, True)
+
 
     return True
 
 
+def optimize_image(file_path, file_path_new=""):
+    if not file_path_new or file_path_new== "":
+        file_path_new = file_path
 
+    # optimize images
+    img = Image.open(file_path)
+    # I downsize the image with an ANTIALIAS filter (gives the highest quality)
+    img.thumbnail((720, 405), Image.ANTIALIAS)
+    img.save(file_path_new, optimize=True, quality=95)
+
+def change_aspect_ratio(file_path, file_path_new = ""):
+    if not file_path_new or file_path_new== "":
+        file_path_new = file_path
+
+
+    ideal_width = 720
+    ideal_height = 405
+
+    image = Image.open(file_path)
+    width = image.size[0]
+    height = image.size[1]
+
+    aspect = width / float(height)
+
+
+    ideal_aspect = ideal_width / float(ideal_height)
+
+    if aspect > ideal_aspect:
+        # Then crop the left and right edges:
+        new_width = int(ideal_aspect * height)
+        offset = (width - new_width) / 2
+        resize = (offset, 0, width - offset, height)
+    else:
+        # ... crop the top and bottom:
+        new_height = int(width / ideal_aspect)
+        offset = (height - new_height) / 2
+        resize = (0, offset, width, height - offset)
+
+    thumb = image.crop(resize).resize((ideal_width, ideal_height), Image.ANTIALIAS)
+    thumb.save(file_path_new)
 
 
 # Download latest Github release
