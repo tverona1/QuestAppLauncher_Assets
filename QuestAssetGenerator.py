@@ -24,16 +24,21 @@ QALAG_OUTPUT_DIR = 'qalag'
 QALAG_EXE_PATH = 'bin\\qalag.exe'
 WINDIFF_EXE_PATH = 'bin\\windiff.exe'
 
+APPNAMES_GALAG_NAME = 'appnames_quest_en_US.json'
+
 QUEST_DIR = 'quest'
-SIDEQUEST_DIR = 'sidequest'
 ICONPACK_QUEST = 'iconpack_quest.zip'
 APPNAMES_QUEST = 'appnames_quest.json'
+
 APPNAMES_QUEST_GENREFIED = 'appnames_quest_genrefied.json'
+
+
 ICONPACK_OTHER = 'iconpack_others.zip'
-ICONPACK_SIDEQUEST = 'iconpack_sidequest.zip'
 APPNAMES_OTHER = 'appnames_other.json'
-APPNAMES_SIDEQUEST = 'appnames_sidequest.json'
-APPNAMES_GALAG_NAME = 'appnames_quest_en_US.json'
+
+SIDEQUEST_DIR = 'sidequest'
+APPNAMES_SIDEQUEST = 'appnames_o_sidequest.json' # o before q(-uest) to prio quest store names and banners
+ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip' # o before q(uest) to prio quest store names and banners
 
 
 VRDB_APPS = "vrdb.json"
@@ -231,10 +236,20 @@ def download_sidequest_assets():
                 if extension != ".jpg":
                     print(f"Convert {extension} to JPG => {slugify(sidequest_entry['packagename'])+extension}")
                     try:
-                        Image.open(file_path).convert('RGB').save( os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"]))+".jpg")
+                        file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"]))+".jpg"
+                        Image.open(file_path).convert('RGB').save( file_path_new )
                         os.remove(file_path)
+                        file_path = file_path_new
+                        extension = ".jpg"
                     except Exception as e:
                         print(f"Convert error {e}")
+
+                if extension == ".jpg":
+                    # optimize images
+                    img = Image.open(file_path)
+                    # I downsize the image with an ANTIALIAS filter (gives the highest quality)
+                    img.thumbnail((720, 405), Image.ANTIALIAS)
+                    img.save(file_path, optimize=True, quality=95)
 
 
     # cache loaded app data
@@ -383,6 +398,7 @@ def create_release(repo):
 
 
     print("=== END create_release ===")
+
 
 
 def populate_genre():
