@@ -11,6 +11,7 @@ import json
 import re
 import time
 import unicodedata
+import concurrent.futures
 
 from urllib.request import Request, urlopen
 from PIL import Image
@@ -104,7 +105,6 @@ def main():
     # Download latest assets
     if (args.download_assets):
         download_latest_assets()
-
 
     if (args.download_sidequest):
         download_sidequest_assets()
@@ -213,58 +213,22 @@ def download_sidequest_assets():
     appnames_sidequest_data = {}
 
     if len(sidequest_data["data"]) > 0:
-        for idx, sidequest_entry in enumerate(sidequest_data["data"]):
-            # print(f"{idx} => {sidequest_entry}")
-            print(f"Doing {idx} => {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+            for idx, sidequest_entry in enumerate(sidequest_data["data"]):
+                # print(f"{idx} => {sidequest_entry}")
+                print(f"Doing {idx} => {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
 
-            appnames_sidequest_data[sidequest_entry["packagename"]] = {
-                "name": sidequest_entry["name"],
-                "category": "SideQuest",
-                "category2": "",
-            }
+                appnames_sidequest_data[sidequest_entry["packagename"]] = {
+                    "name": sidequest_entry["name"],
+                    "category": "SideQuest",
+                    "category2": "",
+                }
 
-            image_url = sidequest_entry["image_url"]
-            if not image_url:
-                print(f"No image, use banner")
-                image_url = sidequest_entry["app_banner"]
+                # fetch_sidequest_images(sidequest_entry)
 
+                res = [executor.submit(fetch_sidequest_images, sidequest_entry,idx)]
+                # concurrent.futures.wait(res)
 
-            if not image_url:
-                print(f"NO IMAGE FOR {sidequest_entry['name']}")
-            else:
-                print(f"load image {image_url}")
-                r = requests.get(image_url, allow_redirects=True, headers={'Accept': '*/*'})
-
-                content_type = r.headers['content-type']
-                extension = mimetypes.guess_extension(content_type)
-
-
-                if not extension:
-                    print(f"EXTENSION ERROR: {extension}")
-                    extension = os.path.splitext(image_url)[len(os.path.splitext(image_url))-1]
-                    print(f"NEW TRY: {extension}")
-
-                file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"]))+extension
-                open(file_path, 'wb').write(r.content)
-
-
-                if extension != ".jpg":
-                    print(f"Convert {extension} to JPG => {slugify(sidequest_entry['packagename'])+extension}")
-                    try:
-                        file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"]))+".jpg"
-                        Image.open(file_path).convert('RGB').save( file_path_new )
-                        os.remove(file_path)
-                        file_path = file_path_new
-                        extension = ".jpg"
-                    except Exception as e:
-                        print(f"Convert error {e}")
-
-                if extension == ".jpg":
-                    # optimize images
-                    img = Image.open(file_path)
-                    # I downsize the image with an ANTIALIAS filter (gives the highest quality)
-                    img.thumbnail((720, 405), Image.ANTIALIAS)
-                    img.save(file_path, optimize=True, quality=95)
 
 
     # cache loaded app data
@@ -278,6 +242,54 @@ def download_sidequest_assets():
     zipf = zipfile.ZipFile(os.path.join(TEMP_DIR,ICONPACK_SIDEQUEST), 'w', zipfile.ZIP_DEFLATED)
     zipdir(os.path.join(TEMP_DIR, SIDEQUEST_DIR), zipf)
     zipf.close()
+
+
+def fetch_sidequest_images(sidequest_entry,idx):
+    image_url = sidequest_entry["image_url"]
+
+    if not image_url:
+        print(f"{idx} => No image, use banner")
+        image_url = sidequest_entry["app_banner"]
+
+    if not image_url:
+        print(f"{idx} => NO IMAGE FOR {sidequest_entry['name']}")
+    else:
+        print(f"{idx} => load image {image_url}")
+        r = requests.get(image_url, allow_redirects=True, headers={'Accept': '*/*'})
+
+        content_type = r.headers['content-type']
+        extension = mimetypes.guess_extension(content_type)
+
+        if not extension:
+            print(f"{idx} => EXTENSION ERROR: {extension}")
+            extension = os.path.splitext(image_url)[len(os.path.splitext(image_url)) - 1]
+            print(f"{idx} => NEW TRY: {extension}")
+
+        file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + extension
+        open(file_path, 'wb').write(r.content)
+
+        if extension != ".jpg":
+            print(f"{idx} => Convert {extension} to JPG => {slugify(sidequest_entry['packagename']) + extension}")
+            try:
+                file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR),
+                                             slugify(sidequest_entry["packagename"])) + ".jpg"
+                Image.open(file_path).convert('RGB').save(file_path_new)
+                os.remove(file_path)
+                file_path = file_path_new
+                extension = ".jpg"
+            except Exception as e:
+                print(f"{idx} => Convert error {e}")
+
+        if extension == ".jpg":
+            # optimize images
+            img = Image.open(file_path)
+            # I downsize the image with an ANTIALIAS filter (gives the highest quality)
+            img.thumbnail((720, 405), Image.ANTIALIAS)
+            img.save(file_path, optimize=True, quality=95)
+
+    return True
+
+
 
 
 
