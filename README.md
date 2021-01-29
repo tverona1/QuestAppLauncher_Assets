@@ -14,6 +14,7 @@ Add the repo url in your config.json as described on [QuestAppLauncher Readme](h
 
 ---
 Example config.json
+Be sure to add teh new repo AFTER tverona1 repo
 ```
 {
   "gridSize": {
