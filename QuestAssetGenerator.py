@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 import requests
+import mimetypes
 import shutil
 import subprocess
 import sys
@@ -9,8 +10,10 @@ import zipfile
 import json
 import re
 import time
-import urllib.request
+import unicodedata
 
+from urllib.request import Request, urlopen
+from PIL import Image
 from github import Github  # pip install PyGithub
 
 # Temporary directory for scratch space
@@ -22,11 +25,14 @@ QALAG_EXE_PATH = 'bin\\qalag.exe'
 WINDIFF_EXE_PATH = 'bin\\windiff.exe'
 
 QUEST_DIR = 'quest'
+SIDEQUEST_DIR = 'sidequest'
 ICONPACK_QUEST = 'iconpack_quest.zip'
 APPNAMES_QUEST = 'appnames_quest.json'
 APPNAMES_QUEST_GENREFIED = 'appnames_quest_genrefied.json'
 ICONPACK_OTHER = 'iconpack_others.zip'
+ICONPACK_SIDEQUEST = 'iconpack_sidequest.zip'
 APPNAMES_OTHER = 'appnames_other.json'
+APPNAMES_SIDEQUEST = 'appnames_sidequest.json'
 APPNAMES_GALAG_NAME = 'appnames_quest_en_US.json'
 
 
@@ -47,16 +53,18 @@ def main():
     parser.add_argument('-a', '--access-token', required=True, help='GitHub access token')
     parser.add_argument('-dr', '--download-release', action='store_true', help='Download latest asset release from github')
     parser.add_argument('-da', '--download-assets', action='store_true', help='Download assets from Oculus')
+    parser.add_argument('-ds', '--download-sidequest', action='store_true', help='Download assets from Sidequest')
     parser.add_argument('-g', '--genrefy', action='store_true', help='Genrefy appnames_quest.json file')
     parser.add_argument('-c', '--compare', action='store_true', help='Compare assets')
     parser.add_argument('-r', '--release', action='store_true', help='Draft a github release')
     args = parser.parse_args()
 
     # If nothing is specified, perform all actions
-    if (not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release):
+    if (not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
         print("perform all actions")
         args.download_release = True
         args.download_assets = True
+        args.download_sidequest = True
         args.genrefy = True
         args.compare = True
         args.release = True
@@ -76,6 +84,10 @@ def main():
     # Download latest assets
     if (args.download_assets):
         download_latest_assets()
+
+
+    if (args.download_sidequest):
+        download_sidequest_assets()
 
     # Download latest release
     if (args.download_release):
@@ -98,9 +110,145 @@ def get_release_download_path():
 def get_vrdb_file():
     return os.path.join(os.path.abspath(TEMP_DIR), VRDB_APPS)
 
+def get_cache_file(cachefile):
+    return os.path.join(os.path.abspath(TEMP_DIR), cachefile)
+
 
 def get_galag_download_path():
     return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), QALAG_OUTPUT_DIR))
+
+def download_sidequest_assets():
+
+
+    if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
+        shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
+    os.mkdir(get_cache_file(SIDEQUEST_DIR))
+
+
+
+    # curl "https://api.sidequestvr.com/search-apps
+    # ?search=&page=0&order=rating&direction=desc&app_categories_id=1&tag=null&users_id=null&limit=51&device_filter=all&license_filter=all"
+    # -H "Accept: application/json" -H "Accept-Language: de,en;q=0.7,en-US;q=0.3"
+    # -H "Content-Type: application/json"
+    # -H "Origin: https://sidequestvr.com"
+    headers = {
+        "Origin": "https://sidequestvr.com",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "QuestAppLauncher Assets"
+    }
+
+    limit = 100
+    page = 0
+    results = True
+
+    sidequest_data = []
+
+    while results:
+        sidequest_url = f"https://api.sidequestvr.com/search-apps?search=&page={page}&order=rating&direction=desc&app_categories_id=1&tag=null&users_id=null&limit={limit}&device_filter=quest&license_filter=all"
+        data = []
+
+
+        req = Request(sidequest_url)
+        if (headers):
+            for key, value in headers.items():
+                # print(key, '->', value)
+                req.add_header(key, value)
+        response = urlopen(req)
+        response = response.read()
+
+        if not response or len(response) == 0:
+            print(f'Loading from {sidequest_url} FAILED: response error')
+            exit(1)
+
+        data = json.loads(response)
+
+        if not data:
+            print(f'Loading from {sidequest_url} FAILED: (json) data empty')
+            exit(1)
+        # else:
+        #     print(f'Loading from {VRDB_URL} SUCCESS')
+
+
+        print(f"page => {page}")
+        print(f"results => {len(data['data'])}")
+
+        if (len(data["data"]) > 0):
+
+            # print(sidequest_data)
+            # print(data["data"])
+
+            if not sidequest_data:
+                sidequest_data = data
+            else:
+                sidequest_data["data"] += data["data"]
+
+            page = page + 1
+        else:
+            results = False
+
+
+    print(f"total results => {len(sidequest_data['data'])}")
+
+    appnames_sidequest_data = {}
+
+    if len(sidequest_data["data"]) > 0:
+        for idx, sidequest_entry in enumerate(sidequest_data["data"]):
+            # print(f"{idx} => {sidequest_entry}")
+            print(f"Doing {idx} => {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
+
+            appnames_sidequest_data[sidequest_entry["packagename"]] = {
+                "name": sidequest_entry["name"],
+                "category": "SideQuest",
+                "category2": "",
+            }
+
+            image_url = sidequest_entry["image_url"]
+            if not image_url:
+                print(f"No image, use banner")
+                image_url = sidequest_entry["app_banner"]
+
+
+            if not image_url:
+                print(f"NO IMAGE FOR {sidequest_entry['name']}")
+            else:
+                print(f"load image {image_url}")
+                r = requests.get(image_url, allow_redirects=True, headers={'Accept': '*/*'})
+
+                content_type = r.headers['content-type']
+                extension = mimetypes.guess_extension(content_type)
+
+
+                if not extension:
+                    print(f"EXTENSION ERROR: {extension}")
+                    extension = os.path.splitext(image_url)[len(os.path.splitext(image_url))-1]
+                    print(f"NEW TRY: {extension}")
+
+                file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"]))+extension
+                open(file_path, 'wb').write(r.content)
+
+
+                if extension != ".jpg":
+                    print(f"Convert {extension} to JPG => {slugify(sidequest_entry['packagename'])+extension}")
+                    try:
+                        Image.open(file_path).convert('RGB').save( os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"]))+".jpg")
+                        os.remove(file_path)
+                    except Exception as e:
+                        print(f"Convert error {e}")
+
+
+    # cache loaded app data
+    print(f"write {APPNAMES_SIDEQUEST}")
+    with open(get_cache_file(APPNAMES_SIDEQUEST), 'w', encoding='utf8') as outfile:
+        json.dump(appnames_sidequest_data, outfile, indent=4, ensure_ascii=False)
+
+
+    # Extract quest icons
+    print(f"zip images {ICONPACK_SIDEQUEST}")
+    zipf = zipfile.ZipFile(os.path.join(TEMP_DIR,ICONPACK_SIDEQUEST), 'w', zipfile.ZIP_DEFLATED)
+    zipdir(os.path.join(TEMP_DIR, SIDEQUEST_DIR), zipf)
+    zipf.close()
+
 
 
 # Download latest Github release
@@ -218,6 +366,15 @@ def create_release(repo):
         print(f"upload {APPNAMES_QUEST_GENREFIED}")
         release.upload_asset(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED))
 
+
+    if (os.path.isfile(get_cache_file(APPNAMES_SIDEQUEST))):
+        print(f"upload {APPNAMES_SIDEQUEST}")
+        release.upload_asset(get_cache_file(APPNAMES_SIDEQUEST))
+
+    if (os.path.isfile(get_cache_file(ICONPACK_SIDEQUEST))):
+        print(f"upload {ICONPACK_SIDEQUEST}")
+        release.upload_asset(get_cache_file(ICONPACK_SIDEQUEST))
+
     print(f"upload {APPNAMES_QUEST}")
     release.upload_asset(os.path.join(get_galag_download_path(), APPNAMES_QUEST))
 
@@ -238,7 +395,7 @@ def populate_genre():
 
     if app_file_age_in_hours is False or app_file_age_in_hours >= VRDB_CACHETIME:
         print(f"Load applist from {VRDB_URL}")
-        vrdb_data = load_json(VRDB_URL)
+        vrdb_data = load_json(VRDB_URL, VRDB_APPS)
     else:
         print(f"Load applist from cached {get_vrdb_file()}")
         vrdb_data = load_json(get_vrdb_file())
@@ -251,29 +408,37 @@ def populate_genre():
         json.dump(appname_quest_data_with_genres, outfile, indent=4, ensure_ascii=False)
 
 
-def load_json(path_or_url):
+def load_json(path_or_url, cachefile ="", headers = {}):
     data = []
-    if path_or_url.find("http") == 0:
-        response = urllib.request.urlopen(path_or_url)
+    if path_or_url.find("http") == 0: # begins with http
+
+        req = Request(path_or_url)
+        if(headers):
+            for key, value in headers.items():
+                # print(key, '->', value)
+                req.add_header(key, value)
+        response = urlopen(req)
         response = response.read()
         if not response or len(response) == 0:
-            print(f'Loading from {VRDB_URL} FAILED: response error')
+            print(f'Loading from {path_or_url} FAILED: response error')
             exit(1)
         data = json.loads(response)
 
         if not data:
-            print(f'Loading from {VRDB_URL} FAILED: (json) data empty')
+            print(f'Loading from {path_or_url} FAILED: (json) data empty')
             exit(1)
         # else:
         #     print(f'Loading from {VRDB_URL} SUCCESS')
 
         # cache loaded app data
-        with open(get_vrdb_file(), 'w', encoding='utf8') as outfile:
+        with open(get_cache_file(cachefile), 'w', encoding='utf8') as outfile:
             json.dump(data, outfile, indent=4, ensure_ascii=False)
     else:
         with open(path_or_url, encoding='utf8') as json_file:
             data = json.load(json_file)
     return data
+
+
 
 
 def parse_genres(app_names,vrdb_data):
@@ -346,6 +511,29 @@ def launch_executable(args, bin_path):
         raise Exception(str.format(str(e) + ". Output: '%s'" % (e.output.decode(sys.stdout.encoding).rstrip()))) from e
     except Exception as e:
         raise type(e)(str.format(str(e) + " when calling '%s'" % (bin_path)))
+
+def slugify(value, allow_unicode=False):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s\.-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')
+
+
+def zipdir(path, ziph):
+    # ziph is zipfile handle
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ziph.write(os.path.join(root, file), os.path.relpath(os.path.join( file), os.path.join(path, '..', '..')))
 
 
 main()

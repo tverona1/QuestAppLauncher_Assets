@@ -8,9 +8,11 @@ Including utility to auto-update the assets
 
 This modded repo adds genres as custom categories, parsed from [vrdb.app](https://vrdb.app/).
 
+Additional SideQuest app banner will get loaded
+
 Add the repo url in your config.json `downloadRepos` section as described in [QuestAppLauncher Readme](https://github.com/tverona1/QuestAppLauncher#configjson-configuration-file)
 
-![grafik](https://user-images.githubusercontent.com/14855001/106215011-514c9f80-61d0-11eb-8e0b-c31d22dd4fd7.png)
+![grafik](https://user-images.githubusercontent.com/14855001/106268646-ad90dd00-622b-11eb-9af9-ecf60f79e992.png)
 
 ---
 ## Example config.json
@@ -52,6 +54,7 @@ QuestAssetGenerator.py -a ACCESS_TOKEN -da -dr -c -g
 -a ACCESS_TOKEN | *required* Peronal Github accesstoken for releasing
 -g  | Add genres to appnames_quest.json
 -da | Download Assets from Oculus Store
+-ds | Download Assets from SideQuest Store
 -dr | Download latest release from github for comparing
 -c  | Compare latest release with new release
 -r  | Create a Github release
