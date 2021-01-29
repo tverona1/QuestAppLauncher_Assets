@@ -43,7 +43,7 @@ ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip' # o before q(uest) to prio quest
 
 
 VRDB_APPS = "vrdb.json"
-VRDB_CACHETIME = 12  # time in hours to refresh the cachefile
+VRDB_CACHETIME = 6  # time in hours to refresh the cachefile
 
 IMGFETCHER_WORKERS = 50
 
