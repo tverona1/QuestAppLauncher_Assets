@@ -8,7 +8,7 @@ Including utility to auto-update the assets
 
 This modded repo adds genres as custom categories, parsed from [vrdb.app](https://vrdb.app/).
 
-Additional SideQuest app banner will get loaded
+Additional SideQuest app banners will get loaded
 
 Add the repo url in your config.json `downloadRepos` section as described in [QuestAppLauncher Readme](https://github.com/tverona1/QuestAppLauncher#configjson-configuration-file)
 
