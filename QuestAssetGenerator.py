@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import os
+import requests
 import shutil
 import subprocess
 import sys
@@ -10,7 +11,6 @@ import re
 import time
 import urllib.request
 
-import requests
 from github import Github  # pip install PyGithub
 
 # Temporary directory for scratch space
