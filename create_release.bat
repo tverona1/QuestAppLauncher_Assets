@@ -1,0 +1,1 @@
+.\venv\Scripts\python.exe QuestAssetGenerator.py -da -dr -ds -c -g -r

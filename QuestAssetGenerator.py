@@ -55,7 +55,7 @@ VRDB_URL = "https://vrdb.app/quest/index_eu.json"
 
 def main():
     parser = argparse.ArgumentParser(description='Quest Asset Generator - Genrefied')
-    parser.add_argument('-a', '--access-token', required=True, help='GitHub access token')
+    parser.add_argument('-a', '--access-token', help='GitHub access token')
     parser.add_argument('-dr', '--download-release', action='store_true', help='Download latest asset release from github')
     parser.add_argument('-da', '--download-assets', action='store_true', help='Download assets from Oculus')
     parser.add_argument('-ds', '--download-sidequest', action='store_true', help='Download assets from Sidequest')
@@ -63,6 +63,21 @@ def main():
     parser.add_argument('-c', '--compare', action='store_true', help='Compare assets')
     parser.add_argument('-r', '--release', action='store_true', help='Draft a github release')
     args = parser.parse_args()
+
+    # use access_token file if no acces token in arguments
+    if (not args.access_token or args.access_token == ""):
+        if os.path.isfile(os.path.join("access_token")):
+            print("use access_token file")
+            with open(os.path.join("access_token")) as f:
+                first_line = f.readline()
+            args.access_token = first_line
+            if not args.access_token or args.access_token == "":
+                print("ERROR: access_token file is empty")
+                exit(1)
+        else:
+            print("ERROR: add your github access token as argument or crete a access_token file")
+            exit(1)
+
 
     # If nothing is specified, perform all actions
     if (not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
