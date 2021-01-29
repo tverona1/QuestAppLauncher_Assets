@@ -2,6 +2,7 @@
 [![GitHub contributors](https://img.shields.io/github/contributors/reloxx13/QuestAppLauncher_Assets.svg)](https://GitHub.com/reloxx13/QuestAppLauncher_Assets/graphs/contributors/)
 [![GitHub stars](https://img.shields.io/github/stars/reloxx13/QuestAppLauncher_Assets.svg)](https://github.com/reloxx13/QuestAppLauncher_Assets/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/reloxx13/QuestAppLauncher_Assets.svg)](https://github.com/reloxx13/QuestAppLauncher_Assets/network)
+[![GitHub watchers](https://badgen.net/github/watchers/reloxx13/QuestAppLauncher_Assets)](https://badgen.net/github/watchers/reloxx13/QuestAppLauncher_Assets)
 [![Github all releases](https://img.shields.io/github/downloads/reloxx13/QuestAppLauncher_Assets/total.svg?label=gh%20downloads)](https://GitHub.com/reloxx13/QuestAppLauncher_Assets/releases/) 
 [![HitCount](http://hits.dwyl.io/reloxx13/QuestAppLauncher_Assets.svg)](http://hits.dwyl.io/reloxx13/QuestAppLauncher_Assets)
 
