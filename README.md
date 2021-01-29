@@ -3,17 +3,18 @@ Assets (icon pack, app names) for QuestAppLauncher
 
 Including utility to auto-update the assets
 
-
 ---
+## Mod info
 
-This modded repo adds genres as custom categorie from vrdb.
+This modded repo adds genres as custom categories, parsed from [vrdb.app](https://vrdb.app/).
 
-Add the repo url in your config.json as described on [QuestAppLauncher Readme](https://github.com/tverona1/QuestAppLauncher#configjson-configuration-file)
+Add the repo url in your config.json `downloadRepos` section as described in [QuestAppLauncher Readme](https://github.com/tverona1/QuestAppLauncher#configjson-configuration-file)
 
 ![grafik](https://user-images.githubusercontent.com/14855001/106215011-514c9f80-61d0-11eb-8e0b-c31d22dd4fd7.png)
 
 ---
-Example config.json
+## Example config.json
+
 Be sure to add teh new repo AFTER tverona1 repo
 ```
 {
@@ -41,9 +42,10 @@ Be sure to add teh new repo AFTER tverona1 repo
 ```
 
 ---
-Generator usage:
-Add args to run specific tasks 
-or run all tasks and do a release
+### Generator usage:
+Windows only   
+Add args to run specific tasks    
+or run all tasks and do a release   
 ```
 QuestAssetGenerator.py -a ACCESS_TOKEN -da -dr -c -g
 
@@ -56,6 +58,8 @@ QuestAssetGenerator.py -a ACCESS_TOKEN -da -dr -c -g
 ```
 
 ---
+
+#### Dev
 
 `python -m venv venv`
 
