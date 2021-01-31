@@ -46,7 +46,7 @@ VRDB_APPS = "vrdb.json"
 VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
 SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
 
-IMGFETCHER_WORKERS = 50
+IMGFETCHER_WORKERS = 20
 
 # Change the region
 # VRDB_URL = "https://vrdb.app/quest/index_us.json"
@@ -435,7 +435,7 @@ def optimize_image(file_path, file_path_new=""):
     img = Image.open(file_path)
     # I downsize the image with an ANTIALIAS filter (gives the highest quality)
     img.thumbnail((720, 405), Image.ANTIALIAS)
-    img.save(file_path_new, optimize=True, quality=95)
+    img.save(file_path_new, optimize=True, quality=90)
 
 
 def change_aspect_ratio(file_path, file_path_new=""):
