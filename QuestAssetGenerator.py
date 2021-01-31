@@ -25,7 +25,7 @@ QALAG_OUTPUT_DIR = 'qalag'
 QALAG_EXE_PATH = 'bin\\qalag.exe'
 WINDIFF_EXE_PATH = 'bin\\windiff.exe'
 
-APPNAMES_GALAG_NAME = 'appnames_quest_en_US.json'
+APPNAMES_qalag_NAME = 'appnames_quest_en_US.json'
 
 QUEST_DIR = 'quest'
 ICONPACK_QUEST = 'iconpack_quest.zip'
@@ -136,7 +136,7 @@ def get_cache_file(cachefile):
     return os.path.join(os.path.abspath(TEMP_DIR), cachefile)
 
 
-def get_galag_download_path():
+def get_qalag_download_path():
     return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), QALAG_OUTPUT_DIR))
 
 def get_override_path(OVERRIDE):
@@ -392,28 +392,28 @@ def download_latest_assets():
 
 
     print("=== START download_latest_assets ===")
-    galag_exe_full_path = os.path.abspath(QALAG_EXE_PATH)
-    galag_output_dir = get_galag_download_path()
+    qalag_exe_full_path = os.path.abspath(QALAG_EXE_PATH)
+    qalag_output_dir = get_qalag_download_path()
 
-    print(f"galag_exe_full_path => {galag_exe_full_path}")
-    print(f"galag_output_dir => {galag_output_dir}")
-    if (os.path.isdir(galag_output_dir)):
+    print(f"qalag_exe_full_path => {qalag_exe_full_path}")
+    print(f"qalag_output_dir => {qalag_output_dir}")
+    if (os.path.isdir(qalag_output_dir)):
         # print(f"delete output dir")
-        shutil.rmtree(galag_output_dir)
+        shutil.rmtree(qalag_output_dir)
 
     # print(f"create output dir")
-    os.mkdir(galag_output_dir)
+    os.mkdir(qalag_output_dir)
 
     # Launch exe, temporarily changing cwd to land results in proper place
     cur_dir = os.path.abspath('.')
-    os.chdir(galag_output_dir)
+    os.chdir(qalag_output_dir)
     print(f"Launch QALAG_EXE")
-    launch_executable([], galag_exe_full_path)
+    launch_executable([], qalag_exe_full_path)
     print(f"Done QALAG_EXE")
     os.chdir(cur_dir)
 
     # Rename file
-    os.rename(os.path.join(galag_output_dir, APPNAMES_GALAG_NAME), os.path.join(galag_output_dir, APPNAMES_QUEST))
+    os.rename(os.path.join(qalag_output_dir, APPNAMES_qalag_NAME), os.path.join(qalag_output_dir, APPNAMES_QUEST))
     print("=== END download_latest_assets ===")
 
 
@@ -425,7 +425,7 @@ def compare():
     if(os.path.isfile(os.path.join(get_release_download_path(), QUEST_DIR))):
         print(f"compare {QUEST_DIR}")
         iconpack_quest_release_ext_path = os.path.join(get_release_download_path(), QUEST_DIR)
-        iconpack_quest_generated_ext_path = os.path.join(get_galag_download_path(), QUEST_DIR)
+        iconpack_quest_generated_ext_path = os.path.join(get_qalag_download_path(), QUEST_DIR)
         launch_executable(['-t', iconpack_quest_release_ext_path, iconpack_quest_generated_ext_path], bin_path=WINDIFF_EXE_PATH)
     else:
         print(f"skip {QUEST_DIR}")
@@ -434,7 +434,7 @@ def compare():
     if (os.path.isfile(os.path.join(get_release_download_path(), APPNAMES_QUEST))):
         print(f"compare {APPNAMES_QUEST}")
         appnames_quest_release_path = os.path.join(get_release_download_path(), APPNAMES_QUEST)
-        appnames_quest_generated_path = os.path.join(get_galag_download_path(), APPNAMES_QUEST)
+        appnames_quest_generated_path = os.path.join(get_qalag_download_path(), APPNAMES_QUEST)
         launch_executable([appnames_quest_release_path, appnames_quest_generated_path], bin_path=WINDIFF_EXE_PATH)
     else:
         print(f"skip {APPNAMES_QUEST}")
@@ -462,9 +462,9 @@ def create_release(repo):
     #     release.upload_asset(os.path.join(get_release_download_path(), ICONPACK_OTHER))
 
 
-    if (os.path.isfile(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED))):
+    if (os.path.isfile(os.path.join(get_qalag_download_path(), APPNAMES_QUEST_GENREFIED))):
         print(f"upload {APPNAMES_QUEST_GENREFIED}")
-        release.upload_asset(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED))
+        release.upload_asset(os.path.join(get_qalag_download_path(), APPNAMES_QUEST_GENREFIED))
 
 
     if (os.path.isfile(get_cache_file(APPNAMES_SIDEQUEST))):
@@ -476,10 +476,10 @@ def create_release(repo):
         release.upload_asset(get_cache_file(ICONPACK_SIDEQUEST))
 
     print(f"upload {APPNAMES_QUEST}")
-    release.upload_asset(os.path.join(get_galag_download_path(), APPNAMES_QUEST))
+    release.upload_asset(os.path.join(get_qalag_download_path(), APPNAMES_QUEST))
 
     print(f"upload {ICONPACK_QUEST}")
-    release.upload_asset(os.path.join(get_galag_download_path(), ICONPACK_QUEST))
+    release.upload_asset(os.path.join(get_qalag_download_path(), ICONPACK_QUEST))
 
 
     print("=== END create_release ===")
@@ -502,10 +502,10 @@ def populate_genre():
         vrdb_data = load_json(get_vrdb_file())
 
 
-    appname_quest_data = load_json(os.path.join(get_galag_download_path(), APPNAMES_QUEST))
+    appname_quest_data = load_json(os.path.join(get_qalag_download_path(), APPNAMES_QUEST))
     appname_quest_data_with_genres = parse_genres(appname_quest_data,vrdb_data)
 
-    with open(os.path.join(get_galag_download_path(), APPNAMES_QUEST_GENREFIED), 'w', encoding='utf8') as outfile:
+    with open(os.path.join(get_qalag_download_path(), APPNAMES_QUEST_GENREFIED), 'w', encoding='utf8') as outfile:
         json.dump(appname_quest_data_with_genres, outfile, indent=4, ensure_ascii=False)
 
 
