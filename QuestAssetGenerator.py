@@ -46,7 +46,7 @@ VRDB_APPS = "vrdb.json"
 VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
 SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
 
-IMGFETCHER_WORKERS = 20
+IMGFETCHER_WORKERS = 5
 
 # Change the region
 # VRDB_URL = "https://vrdb.app/quest/index_us.json"
@@ -85,15 +85,15 @@ def main():
             exit(1)
 
     # If nothing is specified, perform all actions
-    if (
-            not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
-        print("perform all actions")
-        args.download_release = True
-        args.download_assets = True
-        args.download_sidequest = True
-        args.genrefy = True
-        # args.compare = True
-        args.release = True
+    # if (
+    #         not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
+    #     print("perform all actions")
+    #     args.download_release = True
+    #     args.download_assets = True
+    #     args.download_sidequest = True
+    #     args.genrefy = True
+    #     # args.compare = True
+    #     args.release = True
 
     # Instantiate github client
     g = Github(args.access_token)
@@ -110,6 +110,8 @@ def main():
     # Download latest assets
     if (args.download_assets):
         download_latest_assets()
+        if (args.genrefy):
+            populate_genre()
 
     if (args.download_sidequest):
         get_sidequet_categories()
@@ -118,8 +120,6 @@ def main():
     if (args.download_release):
         download_release_assets(repo)
 
-    if (args.genrefy):
-        populate_genre()
 
     if (args.compare):
         compare()
@@ -363,7 +363,7 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
         # change_aspect_ratio(override_path,file_path_new)
 
     else:
-        image_url = sidequest_entry["image_url"]
+        image_url = sidequest_entry["image_url"]+"?size=705"
         if not image_url or image_url == "" or force_banner:
             print(f"{idx} => No image, use banner")
             image_url = sidequest_entry["app_banner"]
@@ -379,7 +379,7 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             # print(r.content)
             # print(r.reason)
             # print(r.text)
-            r.close()
+            # r.close()
             # exit(1)
 
             if r.status_code != 200:
@@ -387,10 +387,13 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
                 print(r.content)
                 print(r.reason)
                 print(r.text)
+                r.close()
                 exit(1)
 
             content_type = r.headers['content-type']
+            print(f"content_type => {content_type}")
             extension = mimetypes.guess_extension(content_type)
+            print(f"extension => {extension}")
 
             if not extension:
                 print(f"{idx} => EXTENSION ERROR: {extension}")
@@ -398,7 +401,12 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
                 print(f"{idx} => NEW TRY: {extension}")
 
             file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + extension
+
+            print("write")
             open(file_path, 'wb').write(r.content)
+            print("written")
+
+            r.close()
 
             if extension != ".jpg":
                 print(f"{idx} => Convert {extension} to JPG => {slugify(sidequest_entry['packagename']) + extension}")
@@ -409,6 +417,8 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
                     os.remove(file_path)
                     file_path = file_path_new
                     extension = ".jpg"
+
+
                 except Exception as e:
                     print(f"{idx} => Convert error: {e}")
 
@@ -424,6 +434,7 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             #     print("image is 1:1, try banner url")
             #     fetch_sidequest_images(sidequest_entry, idx, True)
 
+
     return True
 
 
@@ -431,11 +442,18 @@ def optimize_image(file_path, file_path_new=""):
     if not file_path_new or file_path_new == "":
         file_path_new = file_path
 
-    # optimize images
-    img = Image.open(file_path)
-    # I downsize the image with an ANTIALIAS filter (gives the highest quality)
-    img.thumbnail((720, 405), Image.ANTIALIAS)
-    img.save(file_path_new, optimize=True, quality=90)
+    print(f"Optimize: {file_path}")
+    try:
+        # optimize images
+        img = Image.open(file_path)
+        # I downsize the image with an ANTIALIAS filter (gives the highest quality)
+        img.thumbnail((720, 405), Image.ANTIALIAS)
+        img.save(file_path_new, optimize=True, quality=90)
+
+
+    except Exception as e:
+        print(f"Optimize error: {e}")
+
 
 
 def change_aspect_ratio(file_path, file_path_new=""):
@@ -504,7 +522,7 @@ def download_release_assets(repo):
 
 
 # Download latest assets
-def download_latest_assets():
+def download_latest_assets(genrefy=False):
     print("=== START download_latest_assets ===")
     qalag_exe_full_path = os.path.abspath(QALAG_EXE_PATH)
     qalag_output_dir = get_qalag_download_path()
@@ -529,6 +547,9 @@ def download_latest_assets():
     # Rename file
     os.rename(os.path.join(qalag_output_dir, APPNAMES_qalag_NAME), os.path.join(qalag_output_dir, APPNAMES_QUEST))
     print("=== END download_latest_assets ===")
+
+    if genrefy:
+        populate_genre()
 
 
 # Compare
