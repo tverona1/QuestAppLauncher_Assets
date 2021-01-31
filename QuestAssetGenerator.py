@@ -12,6 +12,7 @@ import re
 import time
 import unicodedata
 import concurrent.futures
+import demjson
 
 from urllib.request import Request, urlopen
 from PIL import Image
@@ -33,24 +34,25 @@ APPNAMES_QUEST = 'appnames_quest.json'
 
 APPNAMES_QUEST_GENREFIED = 'appnames_quest_genrefied.json'
 
-
 ICONPACK_OTHER = 'iconpack_others.zip'
 APPNAMES_OTHER = 'appnames_other.json'
 
 SIDEQUEST_DIR = 'sidequest'
-APPNAMES_SIDEQUEST = 'appnames_o_sidequest.json' # o before q(-uest) to prio quest store names and banners
-ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip' # o before q(uest) to prio quest store names and banners
-
+APPNAMES_SIDEQUEST = 'appnames_o_sidequest.json'  # o before q(-uest) to prio quest store names and banners
+ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip'  # o before q(uest) to prio quest store names and banners
 
 VRDB_APPS = "vrdb.json"
-VRDB_CACHETIME = 6  # time in hours to refresh the cachefile
+
+VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
+SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
 
 IMGFETCHER_WORKERS = 50
-
 
 # Change the region
 # VRDB_URL = "https://vrdb.app/quest/index_us.json"
 VRDB_URL = "https://vrdb.app/quest/index_eu.json"
+
+
 # VRDB_URL = "https://vrdb.app/quest/index_au.json"
 # VRDB_URL = "https://vrdb.app/quest/index_ca.json"
 # VRDB_URL = "https://vrdb.app/quest/index_gb.json"
@@ -59,7 +61,8 @@ VRDB_URL = "https://vrdb.app/quest/index_eu.json"
 def main():
     parser = argparse.ArgumentParser(description='Quest Asset Generator - Genrefied')
     parser.add_argument('-a', '--access-token', help='GitHub access token')
-    parser.add_argument('-dr', '--download-release', action='store_true', help='Download latest asset release from github')
+    parser.add_argument('-dr', '--download-release', action='store_true',
+                        help='Download latest asset release from github')
     parser.add_argument('-da', '--download-assets', action='store_true', help='Download assets from Oculus')
     parser.add_argument('-ds', '--download-sidequest', action='store_true', help='Download assets from Sidequest')
     parser.add_argument('-g', '--genrefy', action='store_true', help='Genrefy appnames_quest.json file')
@@ -81,9 +84,9 @@ def main():
             print("ERROR: add your github access token as argument or crete a access_token file")
             exit(1)
 
-
     # If nothing is specified, perform all actions
-    if (not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
+    if (
+            not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
         print("perform all actions")
         args.download_release = True
         args.download_assets = True
@@ -109,7 +112,7 @@ def main():
         download_latest_assets()
 
     if (args.download_sidequest):
-        download_sidequest_assets()
+        get_sidequet_categories()
 
     # Download latest release
     if (args.download_release):
@@ -132,6 +135,7 @@ def get_release_download_path():
 def get_vrdb_file():
     return os.path.join(os.path.abspath(TEMP_DIR), VRDB_APPS)
 
+
 def get_cache_file(cachefile):
     return os.path.join(os.path.abspath(TEMP_DIR), cachefile)
 
@@ -139,16 +143,93 @@ def get_cache_file(cachefile):
 def get_qalag_download_path():
     return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), QALAG_OUTPUT_DIR))
 
+
 def get_override_path(OVERRIDE):
     return os.path.abspath(os.path.join(os.path.abspath("overrides"), OVERRIDE))
 
-def download_sidequest_assets():
 
 
-    if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
-        shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
-    os.mkdir(get_cache_file(SIDEQUEST_DIR))
+APPNAMES_SIDEQUEST_DATA = {}
+def get_sidequet_categories():
+    print("=== START get_sidequet_categories ===")
+    mainjs_url = "https://sidequestvr.com/main.js"  # this has the categorie in it
 
+
+    # if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
+    #     shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
+
+    if (not os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
+        os.mkdir(get_cache_file(SIDEQUEST_DIR))
+
+    headers = {
+        "Origin": "https://sidequestvr.com",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "QuestAppLauncher Assets"
+    }
+
+    categories = {}
+    req = Request(mainjs_url)
+    if (headers):
+        for key, value in headers.items():
+            # print(key, '->', value)
+            req.add_header(key, value)
+    response = urlopen(req)
+    response = response.read().decode('utf-8')
+
+
+
+    if not response or len(response) == 0:
+        print(f'Loading from {mainjs_url} FAILED: response error')
+        exit(1)
+
+    # print(response)
+
+    #this.sidequestItems=[{...}]
+    match = re.search(r"this.sidequestItems=(\[.*?\])", response, re.MULTILINE | re.DOTALL)
+    if match:
+        js_cats = match.group(1)
+        print(match.group(1))
+        js_cats=js_cats.replace("!0", "\"!0\"")
+        categories = demjson.decode(js_cats)
+
+
+    if len(categories) > 0:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=IMGFETCHER_WORKERS) as executor:
+            for idx, category in enumerate(categories):
+                # print(f"{idx} => {category}")
+                print(f"Doing {idx} => {category['name']}...")
+
+                # if not "tag" in category:
+                #     continue
+
+                res = [executor.submit(download_sidequest_assets, category, idx)]
+                # print(res)
+                # concurrent.futures.wait(res)
+                # APPNAMES_SIDEQUEST_DATA = APPNAMES_SIDEQUEST_DATA + appnames_sidequest_data_sub
+
+            concurrent.futures.wait(res, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+
+
+        # print(APPNAMES_SIDEQUEST_DATA)
+
+        # cache loaded app data
+        print(f"write {APPNAMES_SIDEQUEST}")
+        with open(get_cache_file(APPNAMES_SIDEQUEST), 'w', encoding='utf8') as outfile:
+            json.dump(APPNAMES_SIDEQUEST_DATA, outfile, indent=4, ensure_ascii=False)
+
+        # Extract quest icons
+        print(f"zip images {ICONPACK_SIDEQUEST}")
+        zipf = zipfile.ZipFile(os.path.join(TEMP_DIR, ICONPACK_SIDEQUEST), 'w', zipfile.ZIP_DEFLATED)
+        zipdir(os.path.join(TEMP_DIR, SIDEQUEST_DIR), zipf)
+        zipf.close()
+
+    print("=== END get_sidequet_categories ===")
+
+
+
+def download_sidequest_assets(category,cidx):
+    print("=== START download_sidequest_assets ===")
 
 
     # curl "https://api.sidequestvr.com/search-apps
@@ -166,13 +247,21 @@ def download_sidequest_assets():
     limit = 100
     page = 0
     results = True
+    tag = "null"
+    if 'tag' in category:
+        tag = category['tag']
+    elif category["name"] != 'All Games & Apps':
+        tag = category["name"].replace(" ", "").lower()
+    else:
+        print(category)
+        # exit(1)
 
     sidequest_data = []
 
     while results:
-        sidequest_url = f"https://api.sidequestvr.com/search-apps?search=&page={page}&order=rating&direction=desc&app_categories_id=1&tag=null&users_id=null&limit={limit}&device_filter=quest&license_filter=all"
+        # sidequest_url = f"https://api.sidequestvr.com/search-apps?search=&page={page}&order=rating&direction=desc&app_categories_id=1&tag={tag}&limit={limit}&device_filter=quest&license_filter=all"
+        sidequest_url = f"https://api.sidequestvr.com/search-apps?search=&page={page}&tag={tag}&limit={limit}&device_filter=quest"
         data = []
-
 
         req = Request(sidequest_url)
         if (headers):
@@ -194,9 +283,7 @@ def download_sidequest_assets():
         # else:
         #     print(f'Loading from {VRDB_URL} SUCCESS')
 
-
-        print(f"page => {page}")
-        print(f"results => {len(data['data'])}")
+        print(f"Tag {tag} ({category['name']}) | page => {page}, results => {len(data['data'])}")
 
         if (len(data["data"]) > 0):
 
@@ -212,50 +299,67 @@ def download_sidequest_assets():
         else:
             results = False
 
-
     print(f"total results => {len(sidequest_data['data'])}")
+    # print(sidequest_data)
 
-    appnames_sidequest_data = {}
 
     if len(sidequest_data["data"]) > 0:
         with concurrent.futures.ThreadPoolExecutor(max_workers=IMGFETCHER_WORKERS) as executor:
             for idx, sidequest_entry in enumerate(sidequest_data["data"]):
                 # print(f"{idx} => {sidequest_entry}")
-                print(f"Doing {idx} => {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
+                print(f"Doing {cidx},{idx} => {category['name']} | {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
 
-                appnames_sidequest_data[sidequest_entry["packagename"]] = {
-                    "name": sidequest_entry["name"],
-                    "category": "SideQuest",
-                    "category2": "",
-                }
+                catname = "SideQuest"
+                if category['name'] not in {"All Games & Apps", "Staff Picks"}:
+                    catname = category['name']
 
-                # fetch_sidequest_images(sidequest_entry)
+                if sidequest_entry["packagename"] in APPNAMES_SIDEQUEST_DATA:
+                    if APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category"] == "" or \
+                            APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category"] == "SideQuest":
+                        APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category"] = catname
 
-                res = [executor.submit(fetch_sidequest_images, sidequest_entry,idx)]
-                # concurrent.futures.wait(res)
+                    else:
+                        if APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category2"] == "" or \
+                                APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category2"] == "SideQuest":
+                            APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category2"] = catname
 
-
-
-    # cache loaded app data
-    print(f"write {APPNAMES_SIDEQUEST}")
-    with open(get_cache_file(APPNAMES_SIDEQUEST), 'w', encoding='utf8') as outfile:
-        json.dump(appnames_sidequest_data, outfile, indent=4, ensure_ascii=False)
-
-
-    # Extract quest icons
-    print(f"zip images {ICONPACK_SIDEQUEST}")
-    zipf = zipfile.ZipFile(os.path.join(TEMP_DIR,ICONPACK_SIDEQUEST), 'w', zipfile.ZIP_DEFLATED)
-    zipdir(os.path.join(TEMP_DIR, SIDEQUEST_DIR), zipf)
-    zipf.close()
+                else:
+                    APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]] = {
+                        "name": sidequest_entry["name"],
+                        "category": catname,
+                        "category2": "",
+                    }
 
 
-def fetch_sidequest_images(sidequest_entry,idx, force_banner=False):
+                res = [executor.submit(fetch_sidequest_images, sidequest_entry, idx)]
+
+            concurrent.futures.wait(res, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+
+    # return APPNAMES_SIDEQUEST_DATA
+
+    print("=== END download_sidequest_assets ===")
+
+    return True
+
+
+def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
+    file_path = os.path.join(get_cache_file(SIDEQUEST_DIR),slugify(sidequest_entry["packagename"])) + ".jpg"
+
+    img_file_age_in_hours = get_file_age_in_hours(file_path)
+
+
+    if img_file_age_in_hours is not False:
+        print(f"Cached img file {file_path} is {img_file_age_in_hours} h old")
+        if img_file_age_in_hours <= SIDEQUEST_CACHETIME:
+            return True
+
 
     override_path = os.path.join(get_override_path(SIDEQUEST_DIR), sidequest_entry["packagename"]) + ".jpg"
+
     if os.path.exists(override_path):
         print(f"use override image for {sidequest_entry['packagename']}")
         file_path_new = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + ".jpg"
-        optimize_image(override_path,file_path_new)
+        optimize_image(override_path, file_path_new)
         # change_aspect_ratio(override_path,file_path_new)
 
     else:
@@ -267,8 +371,23 @@ def fetch_sidequest_images(sidequest_entry,idx, force_banner=False):
         if not image_url or image_url == "" or image_url == "n/a":
             print(f"{idx} => NO IMAGE FOR {sidequest_entry['name']}")
         else:
-            print(f"{idx} => load image {image_url}")
+            print(f"{idx} => load image for {sidequest_entry['name']} | {sidequest_entry['packagename']} => {image_url}")
+
             r = requests.get(image_url, allow_redirects=True, headers={'Accept': '*/*'})
+
+            # print(r.headers)
+            # print(r.content)
+            # print(r.reason)
+            # print(r.text)
+            r.close()
+            # exit(1)
+
+            if r.status_code != 200:
+                print(r.headers)
+                print(r.content)
+                print(r.reason)
+                print(r.text)
+                exit(1)
 
             content_type = r.headers['content-type']
             extension = mimetypes.guess_extension(content_type)
@@ -291,11 +410,11 @@ def fetch_sidequest_images(sidequest_entry,idx, force_banner=False):
                     file_path = file_path_new
                     extension = ".jpg"
                 except Exception as e:
-                    print(f"{idx} => Convert error {e}")
+                    print(f"{idx} => Convert error: {e}")
 
             if extension == ".jpg":
-               optimize_image(file_path)
-               # change_aspect_ratio(file_path)
+                optimize_image(file_path)
+                # change_aspect_ratio(file_path)
 
             # image = Image.open(file_path)
             # width = image.size[0]
@@ -305,12 +424,11 @@ def fetch_sidequest_images(sidequest_entry,idx, force_banner=False):
             #     print("image is 1:1, try banner url")
             #     fetch_sidequest_images(sidequest_entry, idx, True)
 
-
     return True
 
 
 def optimize_image(file_path, file_path_new=""):
-    if not file_path_new or file_path_new== "":
+    if not file_path_new or file_path_new == "":
         file_path_new = file_path
 
     # optimize images
@@ -319,10 +437,10 @@ def optimize_image(file_path, file_path_new=""):
     img.thumbnail((720, 405), Image.ANTIALIAS)
     img.save(file_path_new, optimize=True, quality=95)
 
-def change_aspect_ratio(file_path, file_path_new = ""):
-    if not file_path_new or file_path_new== "":
-        file_path_new = file_path
 
+def change_aspect_ratio(file_path, file_path_new=""):
+    if not file_path_new or file_path_new == "":
+        file_path_new = file_path
 
     ideal_width = 720
     ideal_height = 405
@@ -332,7 +450,6 @@ def change_aspect_ratio(file_path, file_path_new = ""):
     height = image.size[1]
 
     aspect = width / float(height)
-
 
     ideal_aspect = ideal_width / float(ideal_height)
 
@@ -353,12 +470,10 @@ def change_aspect_ratio(file_path, file_path_new = ""):
 
 # Download latest Github release
 def download_release_assets(repo):
-
-
     print("=== START download_release_assets ===")
 
     # check if there is a release
-    if(repo.get_releases().totalCount == 0):
+    if (repo.get_releases().totalCount == 0):
         print("WARN: No release found!")
     else:
         release = repo.get_latest_release()
@@ -374,6 +489,8 @@ def download_release_assets(repo):
             print("\tAsset: %s [%s]" % (asset.name, asset.url))
 
             r = requests.get(asset.url, allow_redirects=True, headers={'Accept': 'application/octet-stream'})
+            r.close()
+
             file_path = os.path.join(download_release_path, asset.name)
             open(file_path, 'wb').write(r.content)
 
@@ -383,14 +500,11 @@ def download_release_assets(repo):
         with zipfile.ZipFile(iconpack_quest_release_zip) as zip:
             zip.extractall(iconpack_quest_release_ext_path)
 
-
     print("=== END download_release_assets ===")
 
 
 # Download latest assets
 def download_latest_assets():
-
-
     print("=== START download_latest_assets ===")
     qalag_exe_full_path = os.path.abspath(QALAG_EXE_PATH)
     qalag_output_dir = get_qalag_download_path()
@@ -419,17 +533,15 @@ def download_latest_assets():
 
 # Compare
 def compare():
-
-
     print("=== START compare ===")
-    if(os.path.isfile(os.path.join(get_release_download_path(), QUEST_DIR))):
+    if (os.path.isfile(os.path.join(get_release_download_path(), QUEST_DIR))):
         print(f"compare {QUEST_DIR}")
         iconpack_quest_release_ext_path = os.path.join(get_release_download_path(), QUEST_DIR)
         iconpack_quest_generated_ext_path = os.path.join(get_qalag_download_path(), QUEST_DIR)
-        launch_executable(['-t', iconpack_quest_release_ext_path, iconpack_quest_generated_ext_path], bin_path=WINDIFF_EXE_PATH)
+        launch_executable(['-t', iconpack_quest_release_ext_path, iconpack_quest_generated_ext_path],
+                          bin_path=WINDIFF_EXE_PATH)
     else:
         print(f"skip {QUEST_DIR}")
-
 
     if (os.path.isfile(os.path.join(get_release_download_path(), APPNAMES_QUEST))):
         print(f"compare {APPNAMES_QUEST}")
@@ -441,10 +553,9 @@ def compare():
 
     print("=== END compare ===")
 
+
 # Create release
 def create_release(repo):
-
-
     print("=== START create_release ===")
 
     tag = 'v' + datetime.date.today().strftime('%Y.%m.%d')
@@ -461,11 +572,9 @@ def create_release(repo):
     #     print(f"upload {ICONPACK_OTHER}")
     #     release.upload_asset(os.path.join(get_release_download_path(), ICONPACK_OTHER))
 
-
     if (os.path.isfile(os.path.join(get_qalag_download_path(), APPNAMES_QUEST_GENREFIED))):
         print(f"upload {APPNAMES_QUEST_GENREFIED}")
         release.upload_asset(os.path.join(get_qalag_download_path(), APPNAMES_QUEST_GENREFIED))
-
 
     if (os.path.isfile(get_cache_file(APPNAMES_SIDEQUEST))):
         print(f"upload {APPNAMES_SIDEQUEST}")
@@ -481,18 +590,20 @@ def create_release(repo):
     print(f"upload {ICONPACK_QUEST}")
     release.upload_asset(os.path.join(get_qalag_download_path(), ICONPACK_QUEST))
 
-
     print("=== END create_release ===")
 
-
+def get_file_age_in_hours(file_path):
+    app_file_age_in_hours = False
+    if os.path.isfile(file_path):
+        if os.path.getsize(file_path) != 0:
+            app_file_age_in_hours = round(((int(time.time() - os.path.getmtime(file_path))) / 60 / 60), 2)
+            print(f"Cached file {file_path} is {app_file_age_in_hours}h old")
+    return app_file_age_in_hours
 
 def populate_genre():
     # load cached or live game lists
-    app_file_age_in_hours = False
-    if os.path.isfile(get_vrdb_file()):
-        if os.path.getsize(get_vrdb_file()) != 0:
-            app_file_age_in_hours = round(((int(time.time() - os.path.getmtime(get_vrdb_file()))) / 60 / 60), 2)
-            print(f"Cached app file {get_vrdb_file()} is {app_file_age_in_hours}h old")
+    app_file_age_in_hours = get_file_age_in_hours(get_vrdb_file())
+    print(f"Cached app file {get_vrdb_file()} is {app_file_age_in_hours}h old")
 
     if app_file_age_in_hours is False or app_file_age_in_hours >= VRDB_CACHETIME:
         print(f"Load applist from {VRDB_URL}")
@@ -501,20 +612,19 @@ def populate_genre():
         print(f"Load applist from cached {get_vrdb_file()}")
         vrdb_data = load_json(get_vrdb_file())
 
-
     appname_quest_data = load_json(os.path.join(get_qalag_download_path(), APPNAMES_QUEST))
-    appname_quest_data_with_genres = parse_genres(appname_quest_data,vrdb_data)
+    appname_quest_data_with_genres = parse_genres(appname_quest_data, vrdb_data)
 
     with open(os.path.join(get_qalag_download_path(), APPNAMES_QUEST_GENREFIED), 'w', encoding='utf8') as outfile:
         json.dump(appname_quest_data_with_genres, outfile, indent=4, ensure_ascii=False)
 
 
-def load_json(path_or_url, cachefile ="", headers = {}):
+def load_json(path_or_url, cachefile="", headers={}):
     data = []
-    if path_or_url.find("http") == 0: # begins with http
+    if path_or_url.find("http") == 0:  # begins with http
 
         req = Request(path_or_url)
-        if(headers):
+        if (headers):
             for key, value in headers.items():
                 # print(key, '->', value)
                 req.add_header(key, value)
@@ -540,9 +650,7 @@ def load_json(path_or_url, cachefile ="", headers = {}):
     return data
 
 
-
-
-def parse_genres(app_names,vrdb_data):
+def parse_genres(app_names, vrdb_data):
     # print(app_names)
     for app_name, app_data in app_names.items():
         # print(app_name + " => " + json.dumps(app_data))
@@ -551,7 +659,7 @@ def parse_genres(app_names,vrdb_data):
             print(f"ERROR {app_name} has no app title | app_data => {app_data}")
             continue
 
-        genres = get_genres_from_app_list_by_app_name(app_data["name"],vrdb_data)
+        genres = get_genres_from_app_list_by_app_name(app_data["name"], vrdb_data)
         if genres:
             genres = genres.replace("360 Experience (non-game)", "360 Experience")
             genres = [genres.strip() for genres in genres.split(',')]
@@ -567,16 +675,16 @@ def parse_genres(app_names,vrdb_data):
     return app_names
 
 
-def get_genres_from_app_list_by_app_name(app_name,vrdb_data):
+def get_genres_from_app_list_by_app_name(app_name, vrdb_data):
     genres = ""
     found = False
     for idx, vrdb_entry in enumerate(vrdb_data["data"]):
-        appListName = vrdb_entry[1] # get link with name from json
-        appListName = re.sub('<[^<]+?>', '', appListName) # remove html tags
-        prepared_app_name = app_name.lower().replace(" - demo", "").replace(" - vr comic", "").replace(" - vr","")
+        appListName = vrdb_entry[1]  # get link with name from json
+        appListName = re.sub('<[^<]+?>', '', appListName)  # remove html tags
+        prepared_app_name = app_name.lower().replace(" - demo", "").replace(" - vr comic", "").replace(" - vr", "")
 
         # fix for a hidden special char, dont remove it, i know it looks duplicated!
-        prepared_app_name = prepared_app_name.replace(" – demo","")
+        prepared_app_name = prepared_app_name.replace(" – demo", "")
 
         if prepared_app_name.endswith(' vr'):
             prepared_app_name = prepared_app_name[:-3]
@@ -598,8 +706,6 @@ def get_genres_from_app_list_by_app_name(app_name,vrdb_data):
 
 # Launch executable and return output
 def launch_executable(args, bin_path):
-
-
     print("=== START launch_executable ===")
     print(f"bin_path => {bin_path}")
     print(f"args => {args}")
@@ -612,6 +718,7 @@ def launch_executable(args, bin_path):
         raise Exception(str.format(str(e) + ". Output: '%s'" % (e.output.decode(sys.stdout.encoding).rstrip()))) from e
     except Exception as e:
         raise type(e)(str.format(str(e) + " when calling '%s'" % (bin_path)))
+
 
 def slugify(value, allow_unicode=False):
     """
@@ -634,7 +741,7 @@ def zipdir(path, ziph):
     # ziph is zipfile handle
     for root, dirs, files in os.walk(path):
         for file in files:
-            ziph.write(os.path.join(root, file), os.path.relpath(os.path.join( file), os.path.join(path, '..', '..')))
+            ziph.write(os.path.join(root, file), os.path.relpath(os.path.join(file), os.path.join(path, '..', '..')))
 
 
 main()
