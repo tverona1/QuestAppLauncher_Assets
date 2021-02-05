@@ -41,7 +41,6 @@ SIDEQUEST_DIR = 'sidequest'
 APPNAMES_SIDEQUEST = 'appnames_o_sidequest.json'  # o before q(-uest) to prio quest store names and banners
 ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip'  # o before q(uest) to prio quest store names and banners
 
-VRDB_APPS = "vrdb.json"
 
 VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
 SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
@@ -49,13 +48,12 @@ SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
 IMGFETCHER_WORKERS = 10
 
 # Change the region
-# VRDB_URL = "https://vrdb.app/quest/index_us.json"
-VRDB_URL = "https://vrdb.app/quest/index_eu.json"
+# VRDB_URL_QUEST = "https://vrdb.app/quest/index_us.json"
+VRDB_URL_QUEST = "https://vrdb.app/quest/index_eu.json"
+VRDB_URL_APPLAB = "https://vrdb.app/quest/lab/index_eu.json"
 
-
-# VRDB_URL = "https://vrdb.app/quest/index_au.json"
-# VRDB_URL = "https://vrdb.app/quest/index_ca.json"
-# VRDB_URL = "https://vrdb.app/quest/index_gb.json"
+VRDB_QUEST_CACHE = "vrdb_quest.json"
+VRDB_APPLAB_CACHE = "vrdb_applab.json"
 
 
 CATEGORY_WEIGHTS = {
@@ -73,6 +71,15 @@ CATEGORY_WEIGHTS = {
         "Streaming": 80,
         "All Games & Apps": 0,
     }
+
+CATEGORY_MAPPING = {
+    "FPS": "Shooter",
+    "Relaxation/Meditation": "Relaxation",
+    "Meditation": "Relaxation",
+    "Climbing": "Exploration",
+    "Art/Creativity": "Creativity",
+    "Sports": "Fitness",
+}
 
 
 
@@ -128,8 +135,9 @@ def main():
     # Download latest assets
     if (args.download_assets):
         download_latest_assets()
-        if (args.genrefy):
-            populate_genre()
+
+    if (args.genrefy):
+        populate_genre()
 
     if (args.download_sidequest):
         get_sidequet_categories()
@@ -148,10 +156,6 @@ def main():
 
 def get_release_download_path():
     return os.path.join(os.path.abspath(TEMP_DIR), LATEST_RELASE_DIR)
-
-
-def get_vrdb_file():
-    return os.path.join(os.path.abspath(TEMP_DIR), VRDB_APPS)
 
 
 def get_cache_file(cachefile):
@@ -323,7 +327,7 @@ def get_sidequest_caegory_Data(category,cidx):
             print(f'Loading from {sidequest_url} FAILED: (json) data empty')
             exit(1)
         # else:
-        #     print(f'Loading from {VRDB_URL} SUCCESS')
+        #     print(f'Loading from {VRDB_URL_QUEST} SUCCESS')
 
         print(f"Tag {tag} ({category['name']}) | page => {page}, results => {len(data['data'])}")
 
@@ -367,6 +371,9 @@ def download_sidequest_assets(category,cidx):
                 catname = "SideQuest"
                 if category['name'] not in {"All Games & Apps", "Staff Picks", "App Lab"}:
                     catname = category['name']
+
+
+                catname = CATEGORY_MAPPING.get(catname,catname)
 
                 if sidequest_entry["packagename"] in APPNAMES_SIDEQUEST_DATA:
                     if APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category"] == "" or \
@@ -678,15 +685,22 @@ def get_file_age_in_hours(file_path):
 
 def populate_genre():
     # load cached or live game lists
-    app_file_age_in_hours = get_file_age_in_hours(get_vrdb_file())
-    print(f"Cached app file {get_vrdb_file()} is {app_file_age_in_hours}h old")
+    app_file_age_in_hours = get_file_age_in_hours(get_cache_file(VRDB_QUEST_CACHE))
+    print(f"Cached app file {get_cache_file(VRDB_QUEST_CACHE)} is {app_file_age_in_hours}h old")
 
     if app_file_age_in_hours is False or app_file_age_in_hours >= VRDB_CACHETIME:
-        print(f"Load applist from {VRDB_URL}")
-        vrdb_data = load_json(VRDB_URL, VRDB_APPS)
+        print(f"Load applist from {VRDB_URL_QUEST}")
+        quest_vrdb_data = load_json(VRDB_URL_QUEST, VRDB_QUEST_CACHE)
+        applab_vrdb_data = load_json(VRDB_URL_APPLAB, VRDB_APPLAB_CACHE)
+
+
     else:
-        print(f"Load applist from cached {get_vrdb_file()}")
-        vrdb_data = load_json(get_vrdb_file())
+        print(f"Load applist from cached {get_cache_file(VRDB_QUEST_CACHE)}")
+        quest_vrdb_data = load_json(get_cache_file(VRDB_QUEST_CACHE))
+        print(f"Load applist from cached {get_cache_file(VRDB_APPLAB_CACHE)}")
+        applab_vrdb_data = load_json(get_cache_file(VRDB_APPLAB_CACHE))
+
+    vrdb_data = quest_vrdb_data["data"] + applab_vrdb_data["data"]
 
     appname_quest_data = load_json(os.path.join(get_qalag_download_path(), APPNAMES_QUEST))
     appname_quest_data_with_genres = parse_genres(appname_quest_data, vrdb_data)
@@ -715,7 +729,7 @@ def load_json(path_or_url, cachefile="", headers={}):
             print(f'Loading from {path_or_url} FAILED: (json) data empty')
             exit(1)
         # else:
-        #     print(f'Loading from {VRDB_URL} SUCCESS')
+        #     print(f'Loading from {VRDB_URL_QUEST} SUCCESS')
 
         # cache loaded app data
         with open(get_cache_file(cachefile), 'w', encoding='utf8') as outfile:
@@ -741,8 +755,11 @@ def parse_genres(app_names, vrdb_data):
             genres = [genres.strip() for genres in genres.split(',')]
             # print(genres)
             if len(genres) >= 1:
+
+                genres[0] = CATEGORY_MAPPING.get( genres[0], genres[0])
                 app_names[app_name]["category"] = genres[0]
                 if len(genres) >= 2:
+                    genres[1] = CATEGORY_MAPPING.get( genres[1], genres[1])
                     app_names[app_name]["category2"] = genres[1]
         # elif not genres:
         #     print(f"ERROR app `{app_name}` has no genre")
@@ -754,7 +771,7 @@ def parse_genres(app_names, vrdb_data):
 def get_genres_from_app_list_by_app_name(app_name, vrdb_data):
     genres = ""
     found = False
-    for idx, vrdb_entry in enumerate(vrdb_data["data"]):
+    for idx, vrdb_entry in enumerate(vrdb_data):
         appListName = vrdb_entry[1]  # get link with name from json
         appListName = re.sub('<[^<]+?>', '', appListName)  # remove html tags
         prepared_app_name = app_name.lower().replace(" - demo", "").replace(" - vr comic", "").replace(" - vr", "")
