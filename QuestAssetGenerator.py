@@ -74,8 +74,8 @@ CATEGORY_WEIGHTS = {
 
 CATEGORY_MAPPING = {
     "FPS": "Shooter",
-    "Relaxation/Meditation": "Relaxation",
-    "Meditation": "Relaxation",
+    "Relaxation/Meditation": "Meditation",
+    # "Meditation": "Relaxation",
     "Climbing": "Exploration",
     "Art/Creativity": "Creativity",
     "Sports": "Fitness",
