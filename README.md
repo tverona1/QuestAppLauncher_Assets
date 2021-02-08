@@ -8,17 +8,17 @@
 
 [comment]: <> ([![GitHub license]&#40;https://img.shields.io/github/license/reloxx13/QuestAppLauncher_Assets.svg&#41;]&#40;https://github.com/reloxx13/QuestAppLauncher_Assets/blob/master/LICENSE&#41;)
 
-# QuestAppLauncher_Assets
-Assets (icon pack, app names) for QuestAppLauncher
+# QuestAppLauncher Assets by reloxx13
+Assets (icon pack, app names, genres) for [QuestAppLauncher](https://github.com/tverona1/QuestAppLauncher)
 
 Including utility to auto-update the assets
 
 ---
-## Mod info
+## Info and how-to
 
 This modded repo adds genres as custom categories, parsed from [vrdb.app](https://vrdb.app/).
 
-Additional SideQuest app banners will get loaded
+SideQuest App banners are also added.
 
 Add the repo url in your config.json `downloadRepos` section as described in [QuestAppLauncher Readme](https://github.com/tverona1/QuestAppLauncher#configjson-configuration-file)
 
