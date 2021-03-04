@@ -45,7 +45,7 @@ ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip'  # o before q(uest) to prio ques
 VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
 SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
 
-IMGFETCHER_WORKERS = 10
+IMGFETCHER_WORKERS = 20
 
 # Change the region
 # VRDB_URL_QUEST = "https://vrdb.app/quest/index_us.json"
@@ -65,11 +65,13 @@ CATEGORY_WEIGHTS = {
         "Horror": 5750,
         "Escape": 5500,
         "Puzzle": 5350,
+        "Flying": 5300,
         "Adventure": 3000,
-        "Multiplayer": 100,
         "Early Access": 95,
+        "Multiplayer": 85,
         "Streaming": 80,
         "All Games & Apps": 0,
+        "All": 0,
     }
 
 CATEGORY_MAPPING = {
@@ -220,13 +222,17 @@ def get_sidequet_categories():
     if len(categories) > 0:
 
         processes = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             for idx, category in enumerate(categories):
+
+                # if category['name'] != "All":
+                #     continue
                 # print(f"{idx} => {category}")
                 print(f"Doing {idx} => {category['name']}...")
 
                 # if not "tag" in category:
                 #     continue
+
 
                 processes.append(executor.submit(get_sidequest_caegory_Data, category, idx))
 
@@ -294,9 +300,10 @@ def get_sidequest_caegory_Data(category,cidx):
     page = 0
     results = True
     tag = "null"
+
     if 'tag' in category:
         tag = category['tag']
-    elif category["name"] != 'All Games & Apps':
+    elif category["name"] != 'All Games & Apps' and category["name"] != 'All':
         tag = category["name"].replace(" ", "").lower()
     else:
         print(category)
@@ -307,6 +314,7 @@ def get_sidequest_caegory_Data(category,cidx):
     while results:
         # sidequest_url = f"https://api.sidequestvr.com/search-apps?search=&page={page}&order=rating&direction=desc&app_categories_id=1&tag={tag}&limit={limit}&device_filter=quest&license_filter=all"
         sidequest_url = f"https://api.sidequestvr.com/search-apps?search=&page={page}&tag={tag}&limit={limit}&device_filter=quest"
+
         data = []
 
         req = Request(sidequest_url)
@@ -345,11 +353,17 @@ def get_sidequest_caegory_Data(category,cidx):
         else:
             results = False
 
-    print(f"Tag {tag} ({category['name']}) | TOTAL RESULTS => {len(sidequest_data['data'])}")
+    if sidequest_data:
 
-    result["count"] = len(sidequest_data['data'])
-    result["data"] = sidequest_data["data"]
-    # print(sidequest_data)
+        print(f"Tag {tag} ({category['name']}) | TOTAL RESULTS => {len(sidequest_data['data'])}")
+
+        result["count"] = len(sidequest_data['data'])
+        result["data"] = sidequest_data["data"]
+        # print(sidequest_data)
+    else:
+        result["count"] = 0
+        result["data"] = 0
+
 
     print("=== END get_sidequest_caegory_Data ===")
 
