@@ -179,7 +179,35 @@ def get_cache_file(cachefile):
 
 
 def pack_custom_thumbs():
-    # Extract quest icons
+    for filename in os.listdir(get_cache_file(CUSTOM_THUMBS_DIR)):
+        print(f"filename {filename}")
+
+        file_path = os.path.join(get_cache_file(CUSTOM_THUMBS_DIR), filename)
+        filename_wo_extension = os.path.splitext(filename)[0]
+        extension = os.path.splitext(filename)[len(os.path.splitext(filename)) - 1]
+
+
+        print(f"file_path {file_path}")
+        print(f"filename_wo_extension {filename_wo_extension}")
+        print(f"extension {extension}")
+
+        if not filename.endswith(".jpg"):
+            try:
+                file_path_new = os.path.join(get_cache_file(CUSTOM_THUMBS_DIR),
+                                             filename_wo_extension) + ".jpg"
+                Image.open(file_path).convert('RGB').save(file_path_new)
+                os.remove(file_path)
+                file_path = file_path_new
+                extension = ".jpg"
+
+            except Exception as e:
+                print(f"{filename} => Convert error: {e}")
+
+        # print(f"{idx} => Convert {extension} to JPG => {slugify(sidequest_entry['packagename']) + extension}")
+        optimize_image(file_path)
+
+
+    # zip icons
     print(f"zip images {CUSTOM_THUMBS_DIR}")
     zipf = zipfile.ZipFile(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR+".zip"), 'w', zipfile.ZIP_DEFLATED)
     zipdir(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR), zipf)
@@ -541,7 +569,7 @@ def optimize_image(file_path, file_path_new=""):
     if not file_path_new or file_path_new == "":
         file_path_new = file_path
 
-    # print(f"Optimize: {file_path}")
+    print(f"Optimize: {file_path}")
     try:
         # optimize images
         img = Image.open(file_path)
