@@ -14,6 +14,8 @@ import unicodedata
 import concurrent.futures
 import demjson
 
+from modules.questAssetGatherer import questAssetGatherer
+
 from urllib.request import Request, urlopen
 from PIL import Image
 from github import Github  # pip install PyGithub
@@ -28,6 +30,8 @@ WINDIFF_EXE_PATH = 'bin\\windiff.exe'
 
 APPNAMES_qalag_NAME = 'appnames_quest_en_US.json'
 
+OCULUS_OUTPUT_DIR = 'oculus'
+
 QUEST_DIR = 'quest'
 ICONPACK_QUEST = 'iconpack_quest.zip'
 APPNAMES_QUEST = 'appnames_quest.json'
@@ -37,10 +41,9 @@ APPNAMES_QUEST_GENREFIED = 'appnames_quest_genrefied.json'
 ICONPACK_OTHER = 'iconpack_others.zip'
 APPNAMES_OTHER = 'appnames_other.json'
 
-SIDEQUEST_DIR = 'sidequest'
+SIDEQUEST_DIR = 'iconpack_sidequest'
 APPNAMES_SIDEQUEST = 'appnames_o_sidequest.json'  # o before q(-uest) to prio quest store names and banners
 ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip'  # o before q(uest) to prio quest store names and banners
-
 
 VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
 SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
@@ -55,24 +58,26 @@ VRDB_URL_APPLAB = "https://vrdb.app/quest/lab/index_eu.json"
 VRDB_QUEST_CACHE = "vrdb_quest.json"
 VRDB_APPLAB_CACHE = "vrdb_applab.json"
 
+CUSTOM_THUMBS_DIR = "iconpack_z_custom"
+CUSTOM_APPNAMES = "appnames_z_custom.json"
 
 CATEGORY_WEIGHTS = {
-        "Shooter": 9000,
-        "FPS": 5000,
-        "Music": 8000,
-        "Fitness": 7000,
-        "Combat": 6000,
-        "Horror": 5750,
-        "Escape": 5500,
-        "Puzzle": 5350,
-        "Flying": 5300,
-        "Adventure": 3000,
-        "Early Access": 95,
-        "Multiplayer": 85,
-        "Streaming": 80,
-        "All Games & Apps": 0,
-        "All": 0,
-    }
+    "Shooter": 9000,
+    "FPS": 5000,
+    "Music": 8000,
+    "Fitness": 7000,
+    "Horror": 5750,
+    "Escape": 5500,
+    "Puzzle": 5350,
+    "Flying": 5300,
+    "Combat": 3050,
+    "Adventure": 3000,
+    "Early Access": 95,
+    "Multiplayer": 85,
+    "Streaming": 80,
+    "All Games & Apps": 0,
+    "All": 0,
+}
 
 CATEGORY_MAPPING = {
     "FPS": "Shooter",
@@ -84,20 +89,22 @@ CATEGORY_MAPPING = {
 }
 
 
-
 def main():
     parser = argparse.ArgumentParser(description='Quest Asset Generator - Genrefied')
     parser.add_argument('-a', '--access-token', help='GitHub access token')
     parser.add_argument('-dr', '--download-release', action='store_true',
                         help='Download latest asset release from github')
     parser.add_argument('-da', '--download-assets', action='store_true', help='Download assets from Oculus')
+    parser.add_argument('-do', '--download-oculus', action='store_true',
+                        help='Download assets from Oculus with python parser')
     parser.add_argument('-ds', '--download-sidequest', action='store_true', help='Download assets from Sidequest')
+    parser.add_argument('-pct', '--pack-custom-thumbs', action='store_true', help='Pack custom thumbnails')
     parser.add_argument('-g', '--genrefy', action='store_true', help='Genrefy appnames_quest.json file')
     parser.add_argument('-c', '--compare', action='store_true', help='Compare assets')
     parser.add_argument('-r', '--release', action='store_true', help='Draft a github release')
     args = parser.parse_args()
 
-    # use access_token file if no acces token in arguments
+    # use access_token file if no access token in arguments
     if (not args.access_token or args.access_token == ""):
         if os.path.isfile(os.path.join("access_token")):
             print("use access_token file")
@@ -138,6 +145,14 @@ def main():
     if (args.download_assets):
         download_latest_assets()
 
+    # Download latest assets
+    if (args.download_oculus):
+        download_oculus(args)
+
+    # Download latest assets
+    if (args.pack_custom_thumbs):
+        pack_custom_thumbs()
+
     if (args.genrefy):
         populate_genre()
 
@@ -147,7 +162,6 @@ def main():
     # Download latest release
     if (args.download_release):
         download_release_assets(repo)
-
 
     if (args.compare):
         compare()
@@ -164,20 +178,40 @@ def get_cache_file(cachefile):
     return os.path.join(os.path.abspath(TEMP_DIR), cachefile)
 
 
+def pack_custom_thumbs():
+    # Extract quest icons
+    print(f"zip images {CUSTOM_THUMBS_DIR}")
+    zipf = zipfile.ZipFile(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR+".zip"), 'w', zipfile.ZIP_DEFLATED)
+    zipdir(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR), zipf)
+    zipf.close()
+
 def get_qalag_download_path():
     return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), QALAG_OUTPUT_DIR))
+
+
+def get_oculus_download_path():
+    return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), OCULUS_OUTPUT_DIR))
 
 
 def get_override_path(OVERRIDE):
     return os.path.abspath(os.path.join(os.path.abspath("overrides"), OVERRIDE))
 
 
+def download_oculus(args):
+    print("=== START download_oculus ===")
+    oculus_download_path = get_oculus_download_path()
+    qAG = questAssetGatherer(args, oculus_download_path)
+    qAG.generate_appnames()
+    print("=== END download_oculus ===")
+
 
 APPNAMES_SIDEQUEST_DATA = {}
+
+
 def get_sidequet_categories():
     print("=== START get_sidequet_categories ===")
-    mainjs_url = "https://sidequestvr.com/main.js"  # this has the categorie in it
-
+    # mainjs_url = "https://sidequestvr.com/main.js"  # this has the categorie in it
+    mainjs_url = "https://sidequestvr.com/main-es2015.js"  # this has the categorie in it
 
     # if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
     #     shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
@@ -201,30 +235,29 @@ def get_sidequet_categories():
     response = urlopen(req)
     response = response.read().decode('utf-8')
 
-
-
     if not response or len(response) == 0:
         print(f'Loading from {mainjs_url} FAILED: response error')
         exit(1)
 
-    # print(response)
 
-    #this.sidequestItems=[{...}]
+    # this.sidequestItems=[{...}]
     match = re.search(r"this.sidequestItems=(\[.*?\])", response, re.MULTILINE | re.DOTALL)
     if match:
         js_cats = match.group(1)
         print(match.group(1))
-        js_cats=js_cats.replace("!0", "\"!0\"")
+        js_cats = js_cats.replace("!0", "\"!0\"")
         categories = demjson.decode(js_cats)
+    else:
 
-
+        print(response)
+        print("cats not found in response!")
+        return False
 
     if len(categories) > 0:
 
         processes = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             for idx, category in enumerate(categories):
-
                 # if category['name'] != "All":
                 #     continue
                 # print(f"{idx} => {category}")
@@ -233,8 +266,7 @@ def get_sidequet_categories():
                 # if not "tag" in category:
                 #     continue
 
-
-                processes.append(executor.submit(get_sidequest_caegory_Data, category, idx))
+                processes.append(executor.submit(get_sidequest_category_Data, category, idx))
 
                 # print(res)
                 # concurrent.futures.wait(res)
@@ -250,22 +282,20 @@ def get_sidequet_categories():
                 categories[result["idx"]]["weight"] = weight
                 categories[result["idx"]]["data"] = result["data"]
 
-
         # Order categories by weight
         categories = sorted(categories, key=lambda k: k['weight'], reverse=True)
         # print(categories)
         # exit(0)
 
         for idx, category in enumerate(categories):
-            download_sidequest_assets(category,idx)
-
+            download_sidequest_assets(category, idx)
 
         # print(APPNAMES_SIDEQUEST_DATA)
 
         # cache loaded app data
         print(f"write {APPNAMES_SIDEQUEST}")
         with open(get_cache_file(APPNAMES_SIDEQUEST), 'w', encoding='utf8') as outfile:
-            json.dump(APPNAMES_SIDEQUEST_DATA, outfile, indent=4, ensure_ascii=False) # , sort_keys=True
+            json.dump(APPNAMES_SIDEQUEST_DATA, outfile, indent=4, ensure_ascii=False)  # , sort_keys=True
 
         # Extract quest icons
         print(f"zip images {ICONPACK_SIDEQUEST}")
@@ -276,9 +306,8 @@ def get_sidequet_categories():
     print("=== END get_sidequet_categories ===")
 
 
-
-def get_sidequest_caegory_Data(category,cidx):
-    print("=== START get_sidequest_caegory_Data ===")
+def get_sidequest_category_Data(category, cidx):
+    print("=== START get_sidequest_category_Data ===")
 
     result = {
         "idx": cidx,
@@ -364,30 +393,27 @@ def get_sidequest_caegory_Data(category,cidx):
         result["count"] = 0
         result["data"] = 0
 
-
-    print("=== END get_sidequest_caegory_Data ===")
+    print("=== END get_sidequest_category_Data ===")
 
     return result
 
-def download_sidequest_assets(category,cidx):
+
+def download_sidequest_assets(category, cidx):
     print("=== START download_sidequest_assets ===")
 
-
-
-
     if category["count"] > 0:
-        processes = [];
+        processes = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=IMGFETCHER_WORKERS) as executor:
             for idx, sidequest_entry in enumerate(category["data"]):
                 # print(f"{idx} => {sidequest_entry}")
-                print(f"Doing {cidx} | {idx} => {category['name']} | {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
+                print(
+                    f"Doing {cidx} | {idx} => {category['name']} | {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
 
                 catname = "SideQuest"
                 if category['name'] not in {"All Games & Apps", "Staff Picks", "App Lab"}:
                     catname = category['name']
 
-
-                catname = CATEGORY_MAPPING.get(catname,catname)
+                catname = CATEGORY_MAPPING.get(catname, catname)
 
                 if sidequest_entry["packagename"] in APPNAMES_SIDEQUEST_DATA:
                     if APPNAMES_SIDEQUEST_DATA[sidequest_entry["packagename"]]["category"] == "" or \
@@ -406,7 +432,6 @@ def download_sidequest_assets(category,cidx):
                         "category2": "",
                     }
 
-
                 processes.append(executor.submit(fetch_sidequest_images, sidequest_entry, idx))
 
             concurrent.futures.wait(processes, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
@@ -419,16 +444,14 @@ def download_sidequest_assets(category,cidx):
 
 
 def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
-    file_path = os.path.join(get_cache_file(SIDEQUEST_DIR),slugify(sidequest_entry["packagename"])) + ".jpg"
+    file_path = os.path.join(get_cache_file(SIDEQUEST_DIR), slugify(sidequest_entry["packagename"])) + ".jpg"
 
     img_file_age_in_hours = get_file_age_in_hours(file_path)
-
 
     if img_file_age_in_hours is not False:
         # print(f"Cached img file {file_path} is {img_file_age_in_hours} h old")
         if img_file_age_in_hours <= SIDEQUEST_CACHETIME:
             return True
-
 
     override_path = os.path.join(get_override_path(SIDEQUEST_DIR), sidequest_entry["packagename"]) + ".jpg"
 
@@ -447,9 +470,10 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
         if not image_url or image_url == "" or image_url == "n/a":
             print(f"{idx} => NO IMAGE FOR {sidequest_entry['name']}")
         else:
-            print(f"{idx} => load image for {sidequest_entry['name']} | {sidequest_entry['packagename']} => {image_url}")
+            print(
+                f"{idx} => load image for {sidequest_entry['name']} | {sidequest_entry['packagename']} => {image_url}")
 
-            r = requests.get(image_url+"?size=705", allow_redirects=True, headers={'Accept': '*/*'})
+            r = requests.get(image_url + "?size=705", allow_redirects=True, headers={'Accept': '*/*'})
 
             # print(r.headers)
             # print(r.content)
@@ -510,7 +534,6 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             #     print("image is 1:1, try banner url")
             #     fetch_sidequest_images(sidequest_entry, idx, True)
 
-
     return True
 
 
@@ -529,7 +552,6 @@ def optimize_image(file_path, file_path_new=""):
 
     except Exception as e:
         print(f"Optimize error: {e}")
-
 
 
 def change_aspect_ratio(file_path, file_path_new=""):
@@ -681,6 +703,15 @@ def create_release(repo):
         print(f"upload {ICONPACK_SIDEQUEST}")
         release.upload_asset(get_cache_file(ICONPACK_SIDEQUEST))
 
+    if (os.path.isfile(get_cache_file(CUSTOM_THUMBS_DIR+".zip"))):
+        print(f"upload {CUSTOM_THUMBS_DIR}.zip")
+        release.upload_asset(get_cache_file(CUSTOM_THUMBS_DIR+".zip"))
+
+
+    if (os.path.isfile(get_cache_file(CUSTOM_APPNAMES))):
+        print(f"upload {CUSTOM_APPNAMES}")
+        release.upload_asset(get_cache_file(CUSTOM_APPNAMES))
+
     print(f"upload {APPNAMES_QUEST}")
     release.upload_asset(os.path.join(get_qalag_download_path(), APPNAMES_QUEST))
 
@@ -689,6 +720,7 @@ def create_release(repo):
 
     print("=== END create_release ===")
 
+
 def get_file_age_in_hours(file_path):
     app_file_age_in_hours = False
     if os.path.isfile(file_path):
@@ -696,6 +728,7 @@ def get_file_age_in_hours(file_path):
             app_file_age_in_hours = round(((int(time.time() - os.path.getmtime(file_path))) / 60 / 60), 2)
             # print(f"Cached file {file_path} is {app_file_age_in_hours}h old")
     return app_file_age_in_hours
+
 
 def populate_genre():
     # load cached or live game lists
@@ -770,10 +803,10 @@ def parse_genres(app_names, vrdb_data):
             # print(genres)
             if len(genres) >= 1:
 
-                genres[0] = CATEGORY_MAPPING.get( genres[0], genres[0])
+                genres[0] = CATEGORY_MAPPING.get(genres[0], genres[0])
                 app_names[app_name]["category"] = genres[0]
                 if len(genres) >= 2:
-                    genres[1] = CATEGORY_MAPPING.get( genres[1], genres[1])
+                    genres[1] = CATEGORY_MAPPING.get(genres[1], genres[1])
                     app_names[app_name]["category2"] = genres[1]
         # elif not genres:
         #     print(f"ERROR app `{app_name}` has no genre")
