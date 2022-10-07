@@ -157,7 +157,7 @@ def main():
         populate_genre()
 
     if (args.download_sidequest):
-        get_sidequet_categories()
+        get_sidequest_categories()
 
     # Download latest release
     if (args.download_release):
@@ -236,10 +236,11 @@ def download_oculus(args):
 APPNAMES_SIDEQUEST_DATA = {}
 
 
-def get_sidequet_categories():
-    print("=== START get_sidequet_categories ===")
-    # mainjs_url = "https://sidequestvr.com/main.js"  # this has the categorie in it
-    mainjs_url = "https://sidequestvr.com/main-es2015.js"  # this has the categorie in it
+def get_sidequest_categories():
+    print("=== START get_sidequest_categories ===")
+    # mainjs_url = "https://sidequestvr.com/main.js"  # this has the categories in it, deprecated unknown date
+    # mainjs_url = "https://sidequestvr.com/main-es2015.js"  # this has the categories in it, deprecated ~2022-10-01
+    mainjs_url = "https://sidequestvr.com/main.c62fb63e7fb1f49d.js"  # this has the categories in it
 
     # if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
     #     shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
@@ -260,7 +261,13 @@ def get_sidequet_categories():
         for key, value in headers.items():
             # print(key, '->', value)
             req.add_header(key, value)
-    response = urlopen(req)
+
+    try:
+      response = urlopen(req)
+    except Exception as e:
+        print(f"Could not load `{mainjs_url}`, response => E{e.code}: {e.msg}")
+        exit(1)
+
     response = response.read().decode('utf-8')
 
     if not response or len(response) == 0:
@@ -331,7 +338,7 @@ def get_sidequet_categories():
         zipdir(os.path.join(TEMP_DIR, SIDEQUEST_DIR), zipf)
         zipf.close()
 
-    print("=== END get_sidequet_categories ===")
+    print("=== END get_sidequest_categories ===")
 
 
 def get_sidequest_category_Data(category, cidx):
