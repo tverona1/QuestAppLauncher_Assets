@@ -20,6 +20,8 @@ from urllib.request import Request, urlopen
 from PIL import Image
 from github import Github  # pip install PyGithub
 
+MAIN_JS_FILENAME = 'main.ba458ff760b95fff.js' # from sidequest hp
+
 # Temporary directory for scratch space
 TEMP_DIR = '__temp__'
 LATEST_RELASE_DIR = 'latest_release'
@@ -241,6 +243,7 @@ def get_sidequest_categories():
     # mainjs_url = "https://sidequestvr.com/main.js"  # this has the categories in it, deprecated unknown date
     # mainjs_url = "https://sidequestvr.com/main-es2015.js"  # this has the categories in it, deprecated ~2022-10-01
     mainjs_url = "https://sidequestvr.com/main.c62fb63e7fb1f49d.js"  # this has the categories in it
+    mainjs_url = "https://sidequestvr.com/" + MAIN_JS_FILENAME  # this has the categories in it
 
     # if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
     #     shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
