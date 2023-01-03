@@ -20,7 +20,6 @@ from urllib.request import Request, urlopen
 from PIL import Image
 from github import Github  # pip install PyGithub
 
-MAIN_JS_FILENAME = 'main.ba458ff760b95fff.js' # from sidequest hp
 
 # Temporary directory for scratch space
 TEMP_DIR = '__temp__'
@@ -120,6 +119,7 @@ def main():
             print("ERROR: add your github access token as argument or crete a access_token file")
             exit(1)
 
+
     # If nothing is specified, perform all actions
     # if (
     #         not args.download_release and not args.download_assets and not args.compare and not args.genrefy and not args.release and not args.download_sidequest):
@@ -180,6 +180,51 @@ def get_cache_file(cachefile):
     return os.path.join(os.path.abspath(TEMP_DIR), cachefile)
 
 
+def findMainJsFromSq():
+    mainjs = False
+
+    url = "https://sidequestvr.com"
+
+    headers = {
+        "Origin": "https://sidequestvr.com",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "QuestAppLauncher Assets"
+    }
+
+    categories = {}
+    req = Request(url)
+    if headers:
+        for key, value in headers.items():
+            # print(key, '->', value)
+            req.add_header(key, value)
+
+    try:
+        response = urlopen(req)
+    except Exception as e:
+        print(f"Could not load `{url}`, response => E{e.code}: {e.msg}")
+        exit(1)
+
+    response = response.read().decode('utf-8')
+
+    if not response or len(response) == 0:
+        print(f'Loading from {url} FAILED: response error')
+        exit(1)
+
+    # this.sidequestItems=[{...}]
+    match = re.search(r"src=\"(main\.[A-Za-z0-9]+\.js)\"", response, re.MULTILINE | re.DOTALL)
+    if match:
+        print(f'main.js found: {match.group(1)}')
+        mainjs = match.group(1)
+    else:
+
+        print(response)
+        print("main.js not found in response!")
+        exit(1)
+
+    return mainjs
+
+
 def pack_custom_thumbs():
     for filename in os.listdir(get_cache_file(CUSTOM_THUMBS_DIR)):
         print(f"filename {filename}")
@@ -187,7 +232,6 @@ def pack_custom_thumbs():
         file_path = os.path.join(get_cache_file(CUSTOM_THUMBS_DIR), filename)
         filename_wo_extension = os.path.splitext(filename)[0]
         extension = os.path.splitext(filename)[len(os.path.splitext(filename)) - 1]
-
 
         print(f"file_path {file_path}")
         print(f"filename_wo_extension {filename_wo_extension}")
@@ -208,12 +252,12 @@ def pack_custom_thumbs():
         # print(f"{idx} => Convert {extension} to JPG => {slugify(sidequest_entry['packagename']) + extension}")
         optimize_image(file_path)
 
-
     # zip icons
     print(f"zip images {CUSTOM_THUMBS_DIR}")
-    zipf = zipfile.ZipFile(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR+".zip"), 'w', zipfile.ZIP_DEFLATED)
+    zipf = zipfile.ZipFile(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR + ".zip"), 'w', zipfile.ZIP_DEFLATED)
     zipdir(os.path.join(TEMP_DIR, CUSTOM_THUMBS_DIR), zipf)
     zipf.close()
+
 
 def get_qalag_download_path():
     return os.path.abspath(os.path.join(os.path.abspath(TEMP_DIR), QALAG_OUTPUT_DIR))
@@ -240,10 +284,8 @@ APPNAMES_SIDEQUEST_DATA = {}
 
 def get_sidequest_categories():
     print("=== START get_sidequest_categories ===")
-    # mainjs_url = "https://sidequestvr.com/main.js"  # this has the categories in it, deprecated unknown date
-    # mainjs_url = "https://sidequestvr.com/main-es2015.js"  # this has the categories in it, deprecated ~2022-10-01
-    mainjs_url = "https://sidequestvr.com/main.c62fb63e7fb1f49d.js"  # this has the categories in it
-    mainjs_url = "https://sidequestvr.com/" + MAIN_JS_FILENAME  # this has the categories in it
+    mainjs_url = findMainJsFromSq()
+    mainjs_url = "https://sidequestvr.com/" + mainjs_url  # this has the categories in it
 
     # if (os.path.isdir(get_cache_file(SIDEQUEST_DIR))):
     #     shutil.rmtree(get_cache_file(SIDEQUEST_DIR))
@@ -266,7 +308,7 @@ def get_sidequest_categories():
             req.add_header(key, value)
 
     try:
-      response = urlopen(req)
+        response = urlopen(req)
     except Exception as e:
         print(f"Could not load `{mainjs_url}`, response => E{e.code}: {e.msg}")
         exit(1)
@@ -276,7 +318,6 @@ def get_sidequest_categories():
     if not response or len(response) == 0:
         print(f'Loading from {mainjs_url} FAILED: response error')
         exit(1)
-
 
     # this.sidequestItems=[{...}]
     match = re.search(r"this.sidequestItems=(\[.*?\])", response, re.MULTILINE | re.DOTALL)
@@ -741,10 +782,9 @@ def create_release(repo):
         print(f"upload {ICONPACK_SIDEQUEST}")
         release.upload_asset(get_cache_file(ICONPACK_SIDEQUEST))
 
-    if (os.path.isfile(get_cache_file(CUSTOM_THUMBS_DIR+".zip"))):
+    if (os.path.isfile(get_cache_file(CUSTOM_THUMBS_DIR + ".zip"))):
         print(f"upload {CUSTOM_THUMBS_DIR}.zip")
-        release.upload_asset(get_cache_file(CUSTOM_THUMBS_DIR+".zip"))
-
+        release.upload_asset(get_cache_file(CUSTOM_THUMBS_DIR + ".zip"))
 
     if (os.path.isfile(get_cache_file(CUSTOM_APPNAMES))):
         print(f"upload {CUSTOM_APPNAMES}")
