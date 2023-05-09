@@ -1,24 +1,25 @@
 import argparse
 import datetime
-import os
-import requests
+import json
 import mimetypes
+import os
+import re
 import shutil
 import subprocess
 import sys
-import zipfile
-import json
-import re
 import time
 import unicodedata
+import zipfile
+
 import concurrent.futures
 import demjson
+import requests
+
+from PIL import Image
+from github import Github
+from urllib.request import Request, urlopen
 
 from modules.questAssetGatherer import questAssetGatherer
-
-from urllib.request import Request, urlopen
-from PIL import Image
-from github import Github  # pip install PyGithub
 
 
 # Temporary directory for scratch space
@@ -49,7 +50,7 @@ ICONPACK_SIDEQUEST = 'iconpack_o_sidequest.zip'  # o before q(uest) to prio ques
 VRDB_CACHETIME = 24  # time in hours to refresh the cachefile
 SIDEQUEST_CACHETIME = 24  # time in hours to refresh the cachefile
 
-IMGFETCHER_WORKERS = 20
+IMGFETCHER_WORKERS = 10
 
 # Change the region
 # VRDB_URL_QUEST = "https://vrdb.app/quest/index_us.json"
@@ -76,6 +77,7 @@ CATEGORY_WEIGHTS = {
     "Early Access": 95,
     "Multiplayer": 85,
     "Streaming": 80,
+    "App Lab": 0,
     "All Games & Apps": 0,
     "All": 0,
 }
@@ -118,7 +120,6 @@ def main():
         else:
             print("ERROR: add your github access token as argument or crete a access_token file")
             exit(1)
-
 
     # If nothing is specified, perform all actions
     # if (
@@ -181,48 +182,30 @@ def get_cache_file(cachefile):
 
 
 def findMainJsFromSq():
-    mainjs = False
-
     url = "https://sidequestvr.com"
 
     headers = {
-        "Origin": "https://sidequestvr.com",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
         "User-Agent": "QuestAppLauncher Assets"
     }
 
-    categories = {}
-    req = Request(url)
-    if headers:
-        for key, value in headers.items():
-            # print(key, '->', value)
-            req.add_header(key, value)
-
     try:
-        response = urlopen(req)
-    except Exception as e:
-        print(f"Could not load `{url}`, response => E{e.code}: {e.msg}")
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Could not load `{url}`: {e}")
         exit(1)
 
-    response = response.read().decode('utf-8')
+    response_text = response.text
 
-    if not response or len(response) == 0:
-        print(f'Loading from {url} FAILED: response error')
-        exit(1)
-
-    # this.sidequestItems=[{...}]
-    match = re.search(r"src=\"(main\.[A-Za-z0-9]+\.js)\"", response, re.MULTILINE | re.DOTALL)
+    match = re.search(r"src=\"(main\.[A-Za-z0-9]+\.js)\"", response_text)
     if match:
         print(f'main.js found: {match.group(1)}')
-        mainjs = match.group(1)
+        return match.group(1)
     else:
-
-        print(response)
+        print(response_text)
         print("main.js not found in response!")
         exit(1)
 
-    return mainjs
 
 
 def pack_custom_thumbs():
@@ -355,14 +338,15 @@ def get_sidequest_categories():
 
             for _ in concurrent.futures.as_completed(processes):
                 result = _.result()
-                # print('Result: ', result)
+                # print('Result: ', result["count"])
                 categories[result["idx"]]["count"] = result["count"]
                 weight = CATEGORY_WEIGHTS.get(categories[result["idx"]]["name"], result["count"])
                 categories[result["idx"]]["weight"] = weight
                 categories[result["idx"]]["data"] = result["data"]
 
         # Order categories by weight
-        categories = sorted(categories, key=lambda k: k['weight'], reverse=True)
+        # print('categories: ', categories)
+        categories = sorted(categories, key=lambda k: k.get('weight', 0), reverse=True)
         # print(categories)
         # exit(0)
 
@@ -480,7 +464,7 @@ def get_sidequest_category_Data(category, cidx):
 def download_sidequest_assets(category, cidx):
     print("=== START download_sidequest_assets ===")
 
-    if category["count"] > 0:
+    if category.get("count", 0) > 0:
         processes = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=IMGFETCHER_WORKERS) as executor:
             for idx, sidequest_entry in enumerate(category["data"]):
@@ -489,7 +473,7 @@ def download_sidequest_assets(category, cidx):
                     f"Doing {cidx} | {idx} => {category['name']} | {sidequest_entry['name']} | {sidequest_entry['packagename']}...")
 
                 catname = "SideQuest"
-                if category['name'] not in {"All Games & Apps", "Staff Picks", "App Lab"}:
+                if category['name'] not in {"All Games & Apps", "Staff Picks"}:
                     catname = category['name']
 
                 catname = CATEGORY_MAPPING.get(catname, catname)
@@ -552,23 +536,22 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             print(
                 f"{idx} => load image for {sidequest_entry['name']} | {sidequest_entry['packagename']} => {image_url}")
 
-
-
             for i in range(5):
                 r = requests.get(image_url + "?size=705", allow_redirects=True, headers={'Accept': '*/*'})
                 if r.status_code == 200:
                     print('fetch_sidequest_images => Request successful')
                     break
                 else:
-                    print(f'ERROR fetch_sidequest_images => Request failed with status code {response.status_code}: {r.reason}. Retrying...')
+                    print(
+                        f'ERROR fetch_sidequest_images => Request failed with status code {response.status_code}: {r.reason}. Retrying...')
                     # if r.status_code != 200:
-                        # print("ERROR fetch_sidequest_images => Status code was not 200 ")
-                        # print(r.status_code)
-                        # print(r.headers)
-                        # print(r.content)
-                        # print(r.reason)
-                        # print(r.text)
-                        # r.close()
+                    # print("ERROR fetch_sidequest_images => Status code was not 200 ")
+                    # print(r.status_code)
+                    # print(r.headers)
+                    # print(r.content)
+                    # print(r.reason)
+                    # print(r.text)
+                    # r.close()
 
             # print(r.headers)
             # print(r.content)
@@ -576,7 +559,6 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             # print(r.text)
             # r.close()
             # exit(1)
-
 
             content_type = r.headers['content-type']
             # print(f"content_type => {content_type}")
