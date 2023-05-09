@@ -552,7 +552,23 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             print(
                 f"{idx} => load image for {sidequest_entry['name']} | {sidequest_entry['packagename']} => {image_url}")
 
-            r = requests.get(image_url + "?size=705", allow_redirects=True, headers={'Accept': '*/*'})
+
+
+            for i in range(5):
+                r = requests.get(image_url + "?size=705", allow_redirects=True, headers={'Accept': '*/*'})
+                if r.status_code == 200:
+                    print('fetch_sidequest_images => Request successful')
+                    break
+                else:
+                    print(f'ERROR fetch_sidequest_images => Request failed with status code {response.status_code}: {r.reason}. Retrying...')
+                    # if r.status_code != 200:
+                        # print("ERROR fetch_sidequest_images => Status code was not 200 ")
+                        # print(r.status_code)
+                        # print(r.headers)
+                        # print(r.content)
+                        # print(r.reason)
+                        # print(r.text)
+                        # r.close()
 
             # print(r.headers)
             # print(r.content)
@@ -561,13 +577,6 @@ def fetch_sidequest_images(sidequest_entry, idx, force_banner=False):
             # r.close()
             # exit(1)
 
-            if r.status_code != 200:
-                print(r.headers)
-                print(r.content)
-                print(r.reason)
-                print(r.text)
-                r.close()
-                exit(1)
 
             content_type = r.headers['content-type']
             # print(f"content_type => {content_type}")
